@@ -30,15 +30,16 @@ typedef struct
 #define SNReg 0xC0
 #define SNFreq 3579540
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
-#define PITfreq (1193182l*2)
+#define SampleRate 44100
+#define PITfreq 1193182l
 
 void InitPCjrAudio()
 {
-  _asm{
-    in  al,SNMplxr
-    or  al,01100000b	// set bits 6 and 5 to route SN audio through multiplexor
-    out SNMplxr,al
-  }
+	uint8_t mplx;
+	
+	mplx = inp(SNMplxr);
+	mplx |= 0x60;	// set bits 6 and 5 to route SN audio through multiplexor
+	outp(SNMplxr, mplx);
 }
 
 // Sets an SN voice with volume and a desired frequency
@@ -115,17 +116,15 @@ void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
 
 void ClosePCjrAudio()
 {
-	uint8_t chan;
+	uint8_t chan, mplx;
 
 	for (chan = 0; chan < 3; chan++)
 		SetPCjrAudio(chan,440,0);
 	
 	// Reset the multiplexor
-	_asm{
-		in  al,SNMplxr
-		and al,10011100b	// clear 6 and 5 to route PC speaker through multiplexor; 1 and 0 turn off timer signal
-		out SNMplxr,al
-	}
+	mplx = inp(SNMplxr);
+	mplx &= 0x9C;	// clear 6 and 5 to route PC speaker through multiplexor; 1 and 0 turn off timer signal
+	outp(SNMplxr, mplx);
 }
 
 #define iMC_Chan0 0
@@ -167,6 +166,16 @@ void tickWait(uint16_t numticks)
   cmp    si,numticks    // compare si to maximum time allowed
   jb     @wait          // if still below, keep waiting; if above, blow doors
   }
+}
+
+int keypressed(void)
+{
+	union REGPACK regs;
+	regs.h.ah = 1;
+
+	intr(0x16, &regs);
+
+	return !(regs.x.flags & INTR_ZF);     // Check zero-flag
 }
 
 int main(int argc, char* argv[])
@@ -259,8 +268,9 @@ int main(int argc, char* argv[])
 	// We do this so we can get a sensible countdown value from mode 2 instead
 	// of the 2xspeedup var from mode 3.  I have no idea why old BIOSes init
 	// mode 3; everything 486 and later inits mode 2.  Go figure.  This should
-	// not damage anything in DOS or TSRs, in case you were wondering.}
+	// not damage anything in DOS or TSRs, in case you were wondering.
 	//InitChannel(0,3,2,$0000);
+	outp(0x43, 0x34);
 
 	while (playing)
 	{
@@ -285,12 +295,13 @@ int main(int argc, char* argv[])
 					idx++;	// advance to data position
 					w = pVGM[idx] | (pVGM[idx+1]  << 8);
 					// max reasonable tickWait time is 50ms, so handle larger values in slices
-					/*if (w > (samplerate / 20) then repeat
-					tickWait(PITfreq div 20); {wait 1/20th}
-					dec(w,44100 div 20) {reduce total wait value by time we waited}
-					until w <= (samplerate div 20);
-					tickWait(PITFreq div (samplerate div w)); {handle only or remaining slice}
-					*/
+					while (w > (SampleRate / 20))
+					{
+						tickWait(PITfreq / 20);
+						w -= (SampleRate / 20);
+					};
+					
+					tickWait(PITfreq / (SampleRate / w));
 					idx += 2;	// advance to next command
 					break;
 				}
@@ -337,11 +348,9 @@ int main(int argc, char* argv[])
 				break;
 		}
 
-    // handle input
-    /*if keypressed then case readkeychar of
-      #27:playing:=false;
-    end;
-	*/
+		// handle input
+		if (keypressed())
+			playing = 0;
 	}
   
 	free(pVGM);
