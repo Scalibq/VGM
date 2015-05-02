@@ -1,0 +1,352 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <dos.h>
+#include <conio.h>
+
+typedef struct
+{
+	uint32_t VGMIdent, EOFoffset, Version, SN76489clock;
+	uint32_t YM2413clock, GD3offset, totalSamples, loopOffset;
+	uint32_t loopNumSamples, Rate;
+	uint16_t SNFB;
+	uint8_t _SNW, _SF;
+	uint32_t YM2612clock, YM2151clock, VGMdataoffset, SegaPCMclock, SPCMInterface;
+	uint32_t RF5C68clock, YM2203clock, YM2608clock, YM2610Bclock;
+	uint32_t YM3812clock, YM3526clock, Y8950clock, YMF262clock;
+	uint32_t YMF278Bclock, YMF271clock, YMZ280Bclock, RF5C164clock;
+	uint32_t PWMclock, AY8910clock;
+	uint8_t _AYT;
+	uint8_t AYFlags[2];
+    uint8_t _VM, reserved1, _LB, _LM;
+    uint32_t GBDMGclock, NESAPUclock, MultiPCMclock, uPD7759clock;
+	uint32_t OKIM6258clock;
+	uint8_t _OF, _KF, _CF, reserved2;
+	uint32_t OKIM6295clock, K051649clock, K054539clock, HuC6280clock, C140clock;
+	uint32_t K053260clock, Pokeyclock, QSoundclock, reserved3, reserved4;
+} VGMHeader;
+
+#define VFileIdent 0x206d6756
+#define SNReg 0xC0
+#define SNFreq 3579540
+#define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
+#define PITfreq (1193182l*2)
+
+void InitPCjrAudio()
+{
+  _asm{
+    in  al,SNMplxr
+    or  al,01100000b	// set bits 6 and 5 to route SN audio through multiplexor
+    out SNMplxr,al
+  }
+}
+
+// Sets an SN voice with volume and a desired frequency
+// volume is 0-15
+void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
+{
+	uint16_t period;
+
+	period = SNFreq / (32*freq);
+
+	// clamp period so that it doesn't exceed invalid ranges.  This also
+	// removes the need to strip out bits that would interfere with the
+	// OR'd command bits sent to the register
+	if (period > 1023)
+		period = 1023;
+
+/*
+  To set a channel, we first send frequency, then volume.
+  Frequency:
+  76543210 76543210
+  1                 - set bit to tell chip we are selecting a register
+   xx0              - set channel.  4, 2, and 0 are valid values.
+      xxxx          - low 4 bits of period
+           0        - clear bit to tell chip more freq. coming
+            x       - unused
+             xxxxxx - least sig. 6 bits of period
+
+  Sending a word value will not work on PCjr, so send bytes individally.
+  (It does work on Tandy, but we want to be nice.)
+
+  Set attenuation (volume):
+
+  76543210
+  1                 - set bit to tell chip we are selecting a register
+   xx1              - register number (valid values are 1, 3, 5, 7)
+      xxxx          - 4-bit volume where 0 is full volume and 15 is silent)
+
+*/
+  _asm{
+    // this procedure could be optimized to be either smaller OR faster
+    // but I just want to get it working right now
+    // build MSB
+    mov al,chan
+    add al,al            // voice doubled = register #
+    mov cl,4
+    shl al,cl            // get voice reg in place
+    or  al,10000000b     // tell chip we are selecting a reg
+    mov dx,period        // save period val for later
+    mov bx,dx
+    and bl,00001111b     // grab least sig 4 bits of period...
+    or  al,bl            // and put them in MSB
+    out SNReg,al         // output MSB
+    // build LSB
+    mov bx,dx            // restore original period val
+    shr bx,cl            // isolate upper 6 bits
+    and bl,01111111b     // clear bit 7 to indicate rest of freq
+    mov al,bl
+    out SNReg,al         // send LSB
+
+    // set the volume
+    mov al,chan
+    inc al
+    add al,al
+    dec al               // set voice 3 bits to 1, 3, 5, or 7
+    shl al,cl            // get voice value into place
+    or  al,10000000b     // tell chip we're selecting a reg
+    mov bl,volume
+    not bl               // adjust to attenuation; register expects 0 = full, 15 = quiet
+    and bl,00001111b     // mask off junk bits
+    or  al,bl            // merge the volume into the reg select bits
+    out SNReg,al         // send volume
+  }
+}
+
+void ClosePCjrAudio()
+{
+	uint8_t chan;
+
+	for (chan = 0; chan < 3; chan++)
+		SetPCjrAudio(chan,440,0);
+	
+	// Reset the multiplexor
+	_asm{
+		in  al,SNMplxr
+		and al,10011100b	// clear 6 and 5 to route PC speaker through multiplexor; 1 and 0 turn off timer signal
+		out SNMplxr,al
+	}
+}
+
+#define iMC_Chan0 0
+#define iMC_LatchCounter 0
+#define iMC_OpMode2 0100b
+#define iMC_BinaryMode 0
+
+// Waits for numticks to elapse, where a tick is 1/PIT Frequency (~1193182)
+// This procedure is unoptimized; todo: everything in regs
+void tickWait(uint16_t numticks)
+{
+	_asm{
+		// Build PIT command: Channel 0, Latch Counter, Rate Generator, Binary
+  mov    bh,iMC_Chan0+iMC_LatchCounter+iMC_OpMode2+iMC_BinaryMode
+  mov    al,bh
+  // get initial count
+  cli
+  out    43h,al         // Tell timer about it
+  in     al,40h         // Get LSB of timer counter
+  xchg   al,ah          // Save it in ah (xchg accum,reg is 3c 1b
+  in     al,40h         // Get MSB of timer counter
+  sti
+  xchg   al,ah          // Put things in the right order; AX:=starting timer
+  mov    dx,ax          // store for later
+
+@wait:
+  // get next count
+  mov    al,bh          // Use same Mode/Command as before (latch counter, etc.)
+  cli                   // Disable interrupts so our operation is atomic
+  out    43h,al         // Tell timer about it
+  in     al,40h         // Get LSB of timer counter
+  xchg   al,ah          // Save it in ah for a second
+  in     al,40h         // Get MSB of timer counter
+  sti
+  xchg   al,ah          // AX:=new timer value
+  // see if our count period has elapsed
+  mov    si,dx          // copy original value to scratch
+  sub    si,ax          // subtract new value from old value
+  cmp    si,numticks    // compare si to maximum time allowed
+  jb     @wait          // if still below, keep waiting; if above, blow doors
+  }
+}
+
+int main(int argc, char* argv[])
+{
+	FILE* pFile;
+	long size;
+	uint8_t* pVGM;
+	VGMHeader* pHeader;
+	uint32_t idx;
+	uint8_t playing = 1;
+	
+	if (argc != 2)
+	{
+		printf("Usage: VGMPlay <file>\n");
+		
+		return 0;
+	}
+	
+	// Try to read file
+	pFile = fopen(argv[1], "rb");
+	if (pFile == NULL)
+	{
+		printf("File not found: %s!\n", argv[1]);
+		
+		return 0;
+	}
+	
+	fseek(pFile, 0, SEEK_END);
+	size = ftell(pFile);
+	fseek(pFile, 0, SEEK_SET);
+	
+	pVGM = malloc(size);
+	fread(pVGM, size, 1, pFile);
+	fclose(pFile);
+	
+	// File appears sane?
+	pHeader = (VGMHeader*)pVGM;
+	
+	if (pHeader->VGMIdent != VFileIdent)
+	{
+		printf("Header of %02X does not appear to be a VGM file\n", pHeader->VGMIdent);
+		
+		return 0;
+	}
+	
+	printf("%s details:\n", argv[1]);
+	printf("EoF Offset: %08X\n", pHeader->EOFoffset);
+	printf("Version: %08X\n", pHeader->Version);
+	printf("GD3 Offset: %08X\n", pHeader->GD3offset);
+	printf("Total # samples: %lu\n", pHeader->totalSamples);
+	printf("Playback Rate: %08X\n", pHeader->Rate);
+	printf("VGM Data Offset: %08X\n", pHeader->VGMdataoffset);
+
+    if (pHeader->VGMdataoffset == 0)
+		idx = 0x40;
+	else
+		idx = pHeader->VGMdataoffset + 0x34;
+	
+	printf("VGM Data starts at %08X\n", idx);
+	
+    // Can we play this on PCjr hardware?
+    if (pHeader->SN76489clock != 0)
+		printf("SN76489 Clock: %lu Hz\n", pHeader->SN76489clock);
+	else
+	{
+		printf("File does not contain data for our hardware\n");
+		
+		return 3;
+	}
+
+    // Print GD3 tag to be nice
+    /*writeln(#13#10'GD3 Tag Information:');
+    for w:=GD3Offset+$18 to EOFoffset-$4 do begin
+      c:=char(ba^[w]);
+      case c of
+        #32..#127:write(c);
+        #0:if ba^[w+1]=0 then writeln; {see goofy GD3 spec for details}
+      end;
+    end;
+    writeln;
+  end;*/
+
+	// Start playing.  Use polling method as we are not trying to be fancy
+	// at this stage, just trying to get something working}
+
+	InitPCjrAudio();
+	//SetPCjrAudio(1,440,15);
+
+	// init PIT channel 0, 3=access mode lobyte/hibyte, mode 2, 16-bit binary}
+	// We do this so we can get a sensible countdown value from mode 2 instead
+	// of the 2xspeedup var from mode 3.  I have no idea why old BIOSes init
+	// mode 3; everything 486 and later inits mode 2.  Go figure.  This should
+	// not damage anything in DOS or TSRs, in case you were wondering.}
+	//InitChannel(0,3,2,$0000);
+
+	while (playing)
+	{
+		uint8_t cmd = pVGM[idx];
+		
+		switch (cmd)
+		{
+			case 0x4f:
+				idx += 2;	// stereo PSG cmd, ignored
+				break;
+			case 0x50:
+				idx++;	// advance to data position
+				outp(SNReg, pVGM[idx]);
+				idx++;	// advance to next command
+				break;
+			case 0x61:
+				// wait n samples
+				{
+					uint16_t w;
+					
+					printf("v\n");	// indicate we're doing a multiframe/variable wait
+					idx++;	// advance to data position
+					w = pVGM[idx] | (pVGM[idx+1]  << 8);
+					// max reasonable tickWait time is 50ms, so handle larger values in slices
+					/*if (w > (samplerate / 20) then repeat
+					tickWait(PITfreq div 20); {wait 1/20th}
+					dec(w,44100 div 20) {reduce total wait value by time we waited}
+					until w <= (samplerate div 20);
+					tickWait(PITFreq div (samplerate div w)); {handle only or remaining slice}
+					*/
+					idx += 2;	// advance to next command
+					break;
+				}
+			case 0x62:
+				// wait 1/60th second
+				{
+					uint32_t wait = PITfreq / 60;
+					
+					while (wait > 65535)
+					{
+						tickWait(65535);
+						wait -= 65535;
+					}
+					
+					tickWait(wait);
+					
+					idx++;
+					break;
+				}
+			case 0x63:
+				// wait 1/50th second}
+				{
+					uint32_t wait = PITfreq / 50;
+					
+					while (wait > 65535)
+					{
+						tickWait(65535);
+						wait -= 65535;
+					}
+					
+					tickWait(wait);
+					
+					idx++;
+					break;
+				}
+			case 0x66:
+				// end of VGM data
+				playing = 0;
+				break;
+			default:
+			
+				printf("Invalid: 0x2X\n", pVGM[idx]);
+				idx++;
+				break;
+		}
+
+    // handle input
+    /*if keypressed then case readkeychar of
+      #27:playing:=false;
+    end;
+	*/
+	}
+  
+	free(pVGM);
+
+	ClosePCjrAudio();
+
+	return 0;
+}
