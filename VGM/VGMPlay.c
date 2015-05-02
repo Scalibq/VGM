@@ -47,6 +47,7 @@ void InitPCjrAudio()
 void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
 {
 	uint16_t period;
+	uint8_t command;
 
 	period = SNFreq / (32*freq);
 
@@ -78,40 +79,22 @@ void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
       xxxx          - 4-bit volume where 0 is full volume and 15 is silent)
 
 */
-  _asm{
-    // this procedure could be optimized to be either smaller OR faster
-    // but I just want to get it working right now
     // build MSB
-    mov al,chan
-    add al,al            // voice doubled = register #
-    mov cl,4
-    shl al,cl            // get voice reg in place
-    or  al,10000000b     // tell chip we are selecting a reg
-    mov dx,period        // save period val for later
-    mov bx,dx
-    and bl,00001111b     // grab least sig 4 bits of period...
-    or  al,bl            // and put them in MSB
-    out SNReg,al         // output MSB
+	command = chan << 5;	// get voice reg in place
+	command |= 0x80;		// tell chip we are selecting a reg
+	command |= (period & 0xF);	// grab least sig 4 bits of period...
+	outp(SNReg,command);
+	
     // build LSB
-    mov bx,dx            // restore original period val
-    shr bx,cl            // isolate upper 6 bits
-    and bl,01111111b     // clear bit 7 to indicate rest of freq
-    mov al,bl
-    out SNReg,al         // send LSB
+	command = period >> 4;	// isolate upper 6 bits
+	//command &= 0x7F;		// clear bit 7 to indicate rest of freq
+    outp(SNReg,command);
 
     // set the volume
-    mov al,chan
-    inc al
-    add al,al
-    dec al               // set voice 3 bits to 1, 3, 5, or 7
-    shl al,cl            // get voice value into place
-    or  al,10000000b     // tell chip we're selecting a reg
-    mov bl,volume
-    not bl               // adjust to attenuation; register expects 0 = full, 15 = quiet
-    and bl,00001111b     // mask off junk bits
-    or  al,bl            // merge the volume into the reg select bits
-    out SNReg,al         // send volume
-  }
+	command = chan << 5;	// get voice reg in place
+	command |= 0x90;	// tell chip we're selecting a reg for volume
+	command |= volume ^ 0xF;	// adjust to attenuation; register expects 0 = full, 15 = quiet
+	outp(SNReg, command);
 }
 
 void ClosePCjrAudio()
@@ -129,43 +112,44 @@ void ClosePCjrAudio()
 
 #define iMC_Chan0 0
 #define iMC_LatchCounter 0
-#define iMC_OpMode2 0100b
+#define iMC_OpMode2 0x4
 #define iMC_BinaryMode 0
 
-// Waits for numticks to elapse, where a tick is 1/PIT Frequency (~1193182)
-// This procedure is unoptimized; todo: everything in regs
-void tickWait(uint16_t numticks)
+// Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
+void tickWait(uint16_t numTicks)
 {
-	_asm{
-		// Build PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-  mov    bh,iMC_Chan0+iMC_LatchCounter+iMC_OpMode2+iMC_BinaryMode
-  mov    al,bh
-  // get initial count
-  cli
-  out    43h,al         // Tell timer about it
-  in     al,40h         // Get LSB of timer counter
-  xchg   al,ah          // Save it in ah (xchg accum,reg is 3c 1b
-  in     al,40h         // Get MSB of timer counter
-  sti
-  xchg   al,ah          // Put things in the right order; AX:=starting timer
-  mov    dx,ax          // store for later
+	uint16_t startTime, time;
+	
+	// Disable interrupts
+	_disable();
+	
+	// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
+	outp(0x43, iMC_Chan0+iMC_LatchCounter+iMC_OpMode2+iMC_BinaryMode);
+	
+	// Get LSB of timer counter
+	startTime = inp(0x40);
+	
+	// Get MSB of timer counter
+	startTime |= ((uint16_t)inp(0x40)) << 8;
+	
+	// Re-enable interrupts
+	_enable();
+	
+	do
+	{
+		_disable();
 
-@wait:
-  // get next count
-  mov    al,bh          // Use same Mode/Command as before (latch counter, etc.)
-  cli                   // Disable interrupts so our operation is atomic
-  out    43h,al         // Tell timer about it
-  in     al,40h         // Get LSB of timer counter
-  xchg   al,ah          // Save it in ah for a second
-  in     al,40h         // Get MSB of timer counter
-  sti
-  xchg   al,ah          // AX:=new timer value
-  // see if our count period has elapsed
-  mov    si,dx          // copy original value to scratch
-  sub    si,ax          // subtract new value from old value
-  cmp    si,numticks    // compare si to maximum time allowed
-  jb     @wait          // if still below, keep waiting; if above, blow doors
-  }
+		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
+		outp(0x43, iMC_Chan0+iMC_LatchCounter+iMC_OpMode2+iMC_BinaryMode);
+		
+		// Get LSB of timer counter
+		time = inp(0x40);
+		
+		// Get MSB of timer counter
+		time |= ((uint16_t)inp(0x40)) << 8;
+		
+		_enable();
+	} while ((startTime-time) < numTicks);
 }
 
 int keypressed(void)
@@ -342,7 +326,6 @@ int main(int argc, char* argv[])
 				playing = 0;
 				break;
 			default:
-			
 				printf("Invalid: 0x2X\n", pVGM[idx]);
 				idx++;
 				break;
