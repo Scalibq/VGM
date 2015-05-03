@@ -186,6 +186,133 @@ int keypressed(void)
 	return !(regs.x.flags & INTR_ZF);     // Check zero-flag
 }
 
+void PlayBuffer(uint8_t* pPos)
+{
+	int playing = 1;
+		
+	while (playing)
+	{
+		switch (*pPos++)
+		{
+			case 0x4f:
+				// stereo PSG cmd, ignored
+				pPos++;
+				break;
+			case 0x50:
+				outp(SNReg, *pPos++);
+				break;
+			case 0x61:
+				// wait n samples
+				{
+					uint16_t* pW;
+					uint16_t w;
+					
+					printf("v\n");	// indicate we're doing a multiframe/variable wait
+					
+					pW = (uint16_t*)pPos;
+					w = *pW++;
+					// max reasonable tickWait time is 50ms, so handle larger values in slices
+					while (w > (SampleRate / 20))
+					{
+						tickWait(PITfreq / 20);
+						w -= (SampleRate / 20);
+					};
+					
+					tickWait(PITfreq / (SampleRate / w));
+					pPos = (uint8_t*)pW;
+					break;
+				}
+			case 0x62:
+				// wait 1/60th second
+				{
+					uint32_t wait = PITfreq / 60;
+					
+					while (wait > 65535)
+					{
+						tickWait(65535);
+						wait -= 65535;
+					}
+					
+					tickWait(wait);
+					break;
+				}
+			case 0x63:
+				// wait 1/50th second
+				{
+					uint32_t wait = PITfreq / 50;
+					
+					while (wait > 65535)
+					{
+						tickWait(65535);
+						wait -= 65535;
+					}
+					
+					tickWait(wait);
+					break;
+				}
+			case 0x66:
+				// end of VGM data
+				playing = 0;
+				break;
+			default:
+				printf("Invalid: %02X\n", *(pPos-1));
+				break;
+		}
+
+		// handle input
+		if (keypressed())
+			playing = 0;
+	}
+}
+
+int playing = 1;
+uint8_t* pPos = NULL;
+
+void PlayTick()
+{
+	while (1)
+	{
+		switch (*pPos++)
+		{
+			case 0x4f:
+				// stereo PSG cmd, ignored
+				pPos++;
+				break;
+			case 0x50:
+				outp(SNReg, *pPos++);
+				break;
+			case 0x66:
+				// end of VGM data
+				playing = 0;
+			case 0x62:
+				// wait 1/60th second
+			case 0x63:
+				// wait 1/50th second
+				goto endTick;
+				break;
+			default:
+				printf("Invalid: %02X\n", *(pPos-1));
+				break;
+		}
+	}
+endTick:;
+}
+
+void PlayBufferTicks(uint8_t* _pPos)
+{
+	pPos = _pPos;
+	
+	while (playing)
+	{
+		PlayTick();
+		tickWait(PITfreq / 60);
+
+		// handle input
+		if (keypressed())
+			playing = 0;
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	FILE* pFile;
@@ -194,7 +321,6 @@ int main(int argc, char* argv[])
 	uint8_t* pPos;
 	VGMHeader* pHeader;
 	uint32_t idx;
-	uint8_t playing = 1;
 	
 	if (argc != 2)
 	{
@@ -283,79 +409,8 @@ int main(int argc, char* argv[])
 	
 	pPos = pVGM + idx;
 
-	while (playing)
-	{
-		switch (*pPos++)
-		{
-			case 0x4f:
-				pPos++;	// stereo PSG cmd, ignored
-				break;
-			case 0x50:
-				outp(SNReg, *pPos++);
-				break;
-			case 0x61:
-				// wait n samples
-				{
-					uint16_t* pW;
-					uint16_t w;
-					
-					printf("v\n");	// indicate we're doing a multiframe/variable wait
-					
-					pW = (uint16_t*)pPos;
-					w = *pW++;
-					// max reasonable tickWait time is 50ms, so handle larger values in slices
-					while (w > (SampleRate / 20))
-					{
-						tickWait(PITfreq / 20);
-						w -= (SampleRate / 20);
-					};
-					
-					tickWait(PITfreq / (SampleRate / w));
-					pPos = (uint8_t*)pW;
-					break;
-				}
-			case 0x62:
-				// wait 1/60th second
-				{
-					uint32_t wait = PITfreq / 60;
-					
-					while (wait > 65535)
-					{
-						tickWait(65535);
-						wait -= 65535;
-					}
-					
-					tickWait(wait);
-					break;
-				}
-			case 0x63:
-				// wait 1/50th second}
-				{
-					uint32_t wait = PITfreq / 50;
-					
-					while (wait > 65535)
-					{
-						tickWait(65535);
-						wait -= 65535;
-					}
-					
-					tickWait(wait);
-					break;
-				}
-			case 0x66:
-				// end of VGM data
-				playing = 0;
-				break;
-			default:
-				printf("Invalid: %02X\n", *(pPos-1));
-				break;
-		}
-
-		// handle input
-		if (keypressed())
-			playing = 0;
-	}
-  
+	PlayBufferTicks(pPos);
+ 
 	free(pVGM);
 
 	ClosePCjrAudio();
