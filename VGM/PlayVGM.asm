@@ -70,8 +70,17 @@ continue:
 	int		21h
 	
 	; Play file
+	; Adjust file pointer
+	add		word ptr cs:[pSong], 40h
+	
+	; Init PIT at right frequency and mode
+	mov al, 34h
+	out 43h, al
+	
 playLoop:
 	call	DoTick
+	
+	call	DoWait
 
 	mov		al, cs:[playing]
 	test	al, al
@@ -81,6 +90,45 @@ openFailed:
 	; Exit process
 	mov ax,	4C00h
 	int		21h
+	
+iMC_Chan0	equ 0
+iMC_LatchCounter	equ 0
+iMC_OpMode2	equ 100b
+iMC_BinaryMode	equ 0
+numticks equ (PITfreq/60)
+	
+DoWait PROC
+  ; Build PIT command: Channel 0, Latch Counter, Rate Generator, Binary
+  mov    bh,iMC_Chan0+iMC_LatchCounter+iMC_OpMode2+iMC_BinaryMode
+  mov    al,bh
+  ; get initial count
+  cli
+  out    43h,al         ; Tell timer about it
+  in     al,40h         ; Get LSB of timer counter
+  xchg   al,ah          ; Save it in ah (xchg accum,reg is 3c 1b)
+  in     al,40h         ; Get MSB of timer counter
+  sti
+  xchg   al,ah          ; Put things in the right order; AX:=starting timer
+  mov    dx,ax          ; store for later
+
+@wait:
+  ; get next count
+  mov    al,bh          ; Use same Mode/Command as before (latch counter, etc.)
+  cli                   ; Disable interrupts so our operation is atomic
+  out    43h,al         ; Tell timer about it
+  in     al,40h         ; Get LSB of timer counter
+  xchg   al,ah          ; Save it in ah for a second
+  in     al,40h         ; Get MSB of timer counter
+  sti
+  xchg   al,ah          ; AX:=new timer value
+  ; see if our count period has elapsed
+  mov    si,dx          ; copy original value to scratch
+  sub    si,ax          ; subtract new value from old value
+  cmp    si,numticks    ; compare si to maximum time allowed
+  jb     @wait          ; if still below, keep waiting; if above, blow doors
+  
+  ret
+DoWait ENDP
 
 DoTick PROC
 	push	ds
