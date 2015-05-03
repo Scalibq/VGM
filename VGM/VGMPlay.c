@@ -97,13 +97,37 @@ void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
 	outp(SNReg, command);
 }
 
+// Sets an SN voice with volume
+// volume is 0-15
+void SetPCjrAudioVolume(uint8_t chan, uint8_t volume)
+{
+	uint8_t command;
+
+/*
+  Set attenuation (volume):
+
+  76543210
+  1                 - set bit to tell chip we are selecting a register
+   xx1              - register number (valid values are 1, 3, 5, 7)
+      xxxx          - 4-bit volume where 0 is full volume and 15 is silent)
+*/
+    // set the volume
+	command = chan << 5;	// get voice reg in place
+	command |= 0x90;	// tell chip we're selecting a reg for volume
+	command |= volume ^ 0xF;	// adjust to attenuation; register expects 0 = full, 15 = quiet
+	outp(SNReg, command);
+}
+
 void ClosePCjrAudio()
 {
 	uint8_t chan, mplx;
 
 	for (chan = 0; chan < 3; chan++)
 		SetPCjrAudio(chan,440,0);
-	
+
+	// Disable noise channel
+	SetPCjrAudioVolume(3,0);
+
 	// Reset the multiplexor
 	mplx = inp(SNMplxr);
 	mplx &= 0x9C;	// clear 6 and 5 to route PC speaker through multiplexor; 1 and 0 turn off timer signal
@@ -167,6 +191,7 @@ int main(int argc, char* argv[])
 	FILE* pFile;
 	long size;
 	uint8_t* pVGM;
+	uint8_t* pPos;
 	VGMHeader* pHeader;
 	uint32_t idx;
 	uint8_t playing = 1;
@@ -255,29 +280,29 @@ int main(int argc, char* argv[])
 	// not damage anything in DOS or TSRs, in case you were wondering.
 	//InitChannel(0,3,2,$0000);
 	outp(0x43, 0x34);
+	
+	pPos = pVGM + idx;
 
 	while (playing)
 	{
-		uint8_t cmd = pVGM[idx];
-		
-		switch (cmd)
+		switch (*pPos++)
 		{
 			case 0x4f:
-				idx += 2;	// stereo PSG cmd, ignored
+				pPos++;	// stereo PSG cmd, ignored
 				break;
 			case 0x50:
-				idx++;	// advance to data position
-				outp(SNReg, pVGM[idx]);
-				idx++;	// advance to next command
+				outp(SNReg, *pPos++);
 				break;
 			case 0x61:
 				// wait n samples
 				{
+					uint16_t* pW;
 					uint16_t w;
 					
 					printf("v\n");	// indicate we're doing a multiframe/variable wait
-					idx++;	// advance to data position
-					w = pVGM[idx] | (pVGM[idx+1]  << 8);
+					
+					pW = (uint16_t*)pPos;
+					w = *pW++;
 					// max reasonable tickWait time is 50ms, so handle larger values in slices
 					while (w > (SampleRate / 20))
 					{
@@ -286,7 +311,7 @@ int main(int argc, char* argv[])
 					};
 					
 					tickWait(PITfreq / (SampleRate / w));
-					idx += 2;	// advance to next command
+					pPos = (uint8_t*)pW;
 					break;
 				}
 			case 0x62:
@@ -301,8 +326,6 @@ int main(int argc, char* argv[])
 					}
 					
 					tickWait(wait);
-					
-					idx++;
 					break;
 				}
 			case 0x63:
@@ -317,8 +340,6 @@ int main(int argc, char* argv[])
 					}
 					
 					tickWait(wait);
-					
-					idx++;
 					break;
 				}
 			case 0x66:
@@ -326,8 +347,7 @@ int main(int argc, char* argv[])
 				playing = 0;
 				break;
 			default:
-				printf("Invalid: 0x2X\n", pVGM[idx]);
-				idx++;
+				printf("Invalid: %02X\n", *(pPos-1));
 				break;
 		}
 
