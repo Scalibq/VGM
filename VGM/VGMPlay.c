@@ -268,16 +268,8 @@ void PlayBuffer(uint8_t* pPos)
 int playing = 1;
 uint8_t* pPos = NULL;
 
-extern void DoTick();
-extern uint8_t far* far pSong;
-extern uint8_t far stopped;
-
 void PlayTick()
 {
-	DoTick();
-	playing = !stopped;
-	
-	/*
 	while (1)
 	{
 		switch (*pPos++)
@@ -303,13 +295,12 @@ void PlayTick()
 				break;
 		}
 	}
-endTick:;*/
+endTick:;
 }
 
 void PlayBufferTicks(uint8_t* _pPos)
 {
 	pPos = _pPos;
-	pSong = pPos;
 	
 	while (playing)
 	{
@@ -360,7 +351,7 @@ int main(int argc, char* argv[])
 	
 	if (pHeader->VGMIdent != VFileIdent)
 	{
-		printf("Header of %02X does not appear to be a VGM file\n", pHeader->VGMIdent);
+		printf("Header of %08X does not appear to be a VGM file\n", pHeader->VGMIdent);
 		
 		return 0;
 	}
