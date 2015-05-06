@@ -99,7 +99,7 @@ numticks equ (PITfreq/60)
 	
 DoWait PROC
   ; Build PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-  mov    bh,iMC_Chan0+iMC_LatchCounter+iMC_OpMode2+iMC_BinaryMode
+  mov    bh,iMC_Chan0
   mov    al,bh
   ; get initial count
   cli

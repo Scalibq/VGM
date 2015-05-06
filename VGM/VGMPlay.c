@@ -148,7 +148,7 @@ void tickWait(uint16_t numTicks)
 	_disable();
 	
 	// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-	outp(0x43, iMC_Chan0+iMC_LatchCounter+iMC_OpMode2+iMC_BinaryMode);
+	outp(0x43, iMC_Chan0);
 	
 	// Get LSB of timer counter
 	startTime = inp(0x40);
@@ -164,7 +164,7 @@ void tickWait(uint16_t numTicks)
 		_disable();
 
 		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-		outp(0x43, iMC_Chan0+iMC_LatchCounter+iMC_OpMode2+iMC_BinaryMode);
+		outp(0x43, iMC_Chan0);
 		
 		// Get LSB of timer counter
 		time = inp(0x40);
@@ -409,7 +409,7 @@ int main(int argc, char* argv[])
 	
 	pPos = pVGM + idx;
 
-	PlayBufferTicks(pPos);
+	PlayBuffer(pPos);
  
 	free(pVGM);
 
