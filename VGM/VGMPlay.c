@@ -323,35 +323,22 @@ void interrupt Handler(void)
 
 void interrupt (*Old1C)(void);
 
-void SetTimerRate(int rate)
+void SetTimerRate(uint16_t rate)
 {
-	_asm {
-		cli
-
-		mov bx, [rate]
-
-		mov dx, 0x0012
-		mov ax, 0x34DC	// 1.193.180 Hz
-		div bx
-		mov dx, ax
-		add dx, -5
-
-		mov al, 0x34	// Continuous
-		out 0x43, al
-		mov al, dl
-		out 0x40, al
-		nop
-		nop
-		mov al, dh
-		out 0x40, al
-		
-		sti
-	}
+	_disable();
+	
+	// Reset mode to trigger timer immediately
+	outp(0x43, 0x34);
+	
+	outp(0x40, rate);
+	outp(0x40, rate >> 8);
+	
+	_enable();
 }
 
 void InitHandler(void)
 {
-	SetTimerRate(60);	// Play at 60 Hz
+	SetTimerRate(PITfreq/60);	// Play at 60 Hz
 
 	Old1C = _dos_getvect(0x8);
 	_dos_setvect(0x8, Handler);
@@ -359,21 +346,15 @@ void InitHandler(void)
 
 void DeinitHandler(void)
 {
-	_asm {
-		cli
-
-		// Return timer to default 18.2 Hz
-
-		mov al, 0x36
-		out 0x43, al
-		xor al, al
-		out 0x40, al
-		nop
-		nop
-		out 0x40, al
-
-		sti
-	}
+	_disable();
+	
+	// Return timer to default 18.2 Hz
+	outp(0x43, 0x36);
+	
+	outp(0x40, 0);
+	outp(0x40, 0);
+	
+	_enable();
 
 	_dos_setvect(0x8, Old1C);
 }
