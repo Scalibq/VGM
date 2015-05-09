@@ -327,14 +327,17 @@ void PlayBufferTicks(uint8_t* _pPos)
 #define FRAMETICKS (262*76)
 int ticksLeft = 0;
 int tickRate = FRAMETICKS;
+int lastTickRate = FRAMETICKS;
 
 void interrupt Handler(void)
 {
-	ticksLeft -= tickRate;
+	ticksLeft -= lastTickRate;
 
 	if (ticksLeft < 0)
 	{
 		ticksLeft += FRAMETICKS;
+		
+		lastTickRate = tickRate;
 		
 		// Acknowledge timer
 		outp(0x20, 0x20);
@@ -343,6 +346,8 @@ void interrupt Handler(void)
 	}
 	else
 	{
+		lastTickRate = tickRate;
+		
 		// Acknowledge timer
 		outp(0x20, 0x20);
 	}
@@ -376,6 +381,7 @@ void SetTimerCount(uint16_t rate)
 void InitHandler(void)
 {
 	tickRate = 2000;//PITfreq/60;
+	lastTickRate = tickRate;
 	
 	SetTimerRate(tickRate);	// Play at 60 Hz
 
