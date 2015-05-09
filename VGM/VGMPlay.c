@@ -33,7 +33,7 @@ typedef struct
 #define SampleRate 44100
 #define PITfreq 1193182l
 
-void InitPCjrAudio()
+void InitPCjrAudio(void)
 {
 	uint8_t mplx;
 	
@@ -118,7 +118,7 @@ void SetPCjrAudioVolume(uint8_t chan, uint8_t volume)
 	outp(SNReg, command);
 }
 
-void ClosePCjrAudio()
+void ClosePCjrAudio(void)
 {
 	uint8_t chan, mplx;
 
@@ -268,7 +268,7 @@ void PlayBuffer(uint8_t* pPos)
 int playing = 1;
 uint8_t* pPos = NULL;
 
-void PlayTick()
+void PlayTick(void)
 {
 	while (1)
 	{
@@ -313,12 +313,76 @@ void PlayBufferTicks(uint8_t* _pPos)
 	}
 }
 
+void interrupt Handler(void)
+{
+	PlayTick();
+	
+	// Acknowledge timer
+	outp(0x20, 0x20);
+}
+
+void interrupt (*Old1C)(void);
+
+void SetTimerRate(int rate)
+{
+	_asm {
+		cli
+
+		mov bx, [rate]
+
+		mov dx, 0x0012
+		mov ax, 0x34DC	// 1.193.180 Hz
+		div bx
+		mov dx, ax
+		add dx, -5
+
+		mov al, 0x34	// Continuous
+		out 0x43, al
+		mov al, dl
+		out 0x40, al
+		nop
+		nop
+		mov al, dh
+		out 0x40, al
+		
+		sti
+	}
+}
+
+void InitHandler(void)
+{
+	SetTimerRate(60);	// Play at 60 Hz
+
+	Old1C = _dos_getvect(0x8);
+	_dos_setvect(0x8, Handler);
+}
+
+void DeinitHandler(void)
+{
+	_asm {
+		cli
+
+		// Return timer to default 18.2 Hz
+
+		mov al, 0x36
+		out 0x43, al
+		xor al, al
+		out 0x40, al
+		nop
+		nop
+		out 0x40, al
+
+		sti
+	}
+
+	_dos_setvect(0x8, Old1C);
+}
+
 int main(int argc, char* argv[])
 {
 	FILE* pFile;
 	long size;
 	uint8_t* pVGM;
-	uint8_t* pPos;
 	VGMHeader* pHeader;
 	uint32_t idx;
 	
@@ -409,7 +473,12 @@ int main(int argc, char* argv[])
 	
 	pPos = pVGM + idx;
 
-	PlayBuffer(pPos);
+	//PlayBuffer(pPos);
+	InitHandler();
+	
+	while (playing && !keypressed());
+	
+	DeinitHandler();
  
 	free(pVGM);
 
