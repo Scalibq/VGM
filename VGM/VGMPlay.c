@@ -313,12 +313,28 @@ void PlayBufferTicks(uint8_t* _pPos)
 	}
 }
 
+#define FRAMETICKS (262*76)
+int ticksLeft = 0;
+int tickRate = FRAMETICKS;
+
 void interrupt Handler(void)
 {
-	PlayTick();
-	
-	// Acknowledge timer
-	outp(0x20, 0x20);
+	ticksLeft -= tickRate;
+
+	if (ticksLeft < 0)
+	{
+		ticksLeft += FRAMETICKS;
+		
+		// Acknowledge timer
+		outp(0x20, 0x20);
+
+		PlayTick();
+	}
+	else
+	{
+		// Acknowledge timer
+		outp(0x20, 0x20);
+	}
 }
 
 void interrupt (*Old1C)(void);
@@ -336,9 +352,21 @@ void SetTimerRate(uint16_t rate)
 	_enable();
 }
 
+void SetTimerCount(uint16_t rate)
+{
+	_disable();
+	
+	outp(0x40, rate);
+	outp(0x40, rate >> 8);
+	
+	_enable();
+}
+
 void InitHandler(void)
 {
-	SetTimerRate(PITfreq/60);	// Play at 60 Hz
+	tickRate = 2000;//PITfreq/60;
+	
+	SetTimerRate(tickRate);	// Play at 60 Hz
 
 	Old1C = _dos_getvect(0x8);
 	_dos_setvect(0x8, Handler);
