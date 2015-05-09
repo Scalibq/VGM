@@ -176,14 +176,25 @@ void tickWait(uint16_t numTicks)
 	} while ((startTime-time) < numTicks);
 }
 
-int keypressed(void)
+int keypressed(uint8_t* pChar)
 {
+	int ret;
 	union REGPACK regs;
 	regs.h.ah = 1;
 
 	intr(0x16, &regs);
+	
+	ret = !(regs.x.flags & INTR_ZF);     // Check zero-flag
+	
+	if (ret && (pChar != NULL))
+	{
+		// Get keystroke
+		regs.h.ah = 0;
+		intr(0x16, &regs);
+		*pChar = regs.h.al;
+	}
 
-	return !(regs.x.flags & INTR_ZF);     // Check zero-flag
+	return ret;
 }
 
 void PlayBuffer(uint8_t* pPos)
@@ -260,7 +271,7 @@ void PlayBuffer(uint8_t* pPos)
 		}
 
 		// handle input
-		if (keypressed())
+		if (keypressed(NULL))
 			playing = 0;
 	}
 }
@@ -308,7 +319,7 @@ void PlayBufferTicks(uint8_t* _pPos)
 		tickWait(PITfreq / 60);
 
 		// handle input
-		if (keypressed())
+		if (keypressed(NULL))
 			playing = 0;
 	}
 }
@@ -485,7 +496,23 @@ int main(int argc, char* argv[])
 	//PlayBuffer(pPos);
 	InitHandler();
 	
-	while (playing && !keypressed());
+	while (playing)
+	{
+		uint8_t key;
+		
+		if (keypressed(&key))
+		{
+			if (key == '1')
+				tickRate += 100;
+			else if (key == '2')
+				tickRate -= 100;
+			else if (key == '3')
+				playing = 0;
+			
+			SetTimerCount(tickRate);
+			printf("Tickrate: %d\n", tickRate);
+		}
+	}
 	
 	DeinitHandler();
  
