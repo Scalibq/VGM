@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <dos.h>
 #include <conio.h>
+#include <math.h>
+
+#define M_PI 3.1415926535897932384626433832795
 
 typedef struct
 {
@@ -44,19 +47,10 @@ void InitPCjrAudio(void)
 
 // Sets an SN voice with volume and a desired frequency
 // volume is 0-15
-void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
+void SetPCjrAudioPeriod(uint8_t chan, uint16_t period)
 {
-	uint16_t period;
 	uint8_t command;
-
-	period = SNFreq / (32*freq);
-
-	// clamp period so that it doesn't exceed invalid ranges.  This also
-	// removes the need to strip out bits that would interfere with the
-	// OR'd command bits sent to the register
-	if (period > 1023)
-		period = 1023;
-
+	
 /*
   To set a channel, we first send frequency, then volume.
   Frequency:
@@ -89,12 +83,6 @@ void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
 	command = period >> 4;	// isolate upper 6 bits
 	//command &= 0x7F;		// clear bit 7 to indicate rest of freq
     outp(SNReg,command);
-
-    // set the volume
-	command = chan << 5;	// get voice reg in place
-	command |= 0x90;	// tell chip we're selecting a reg for volume
-	command |= volume ^ 0xF;	// adjust to attenuation; register expects 0 = full, 15 = quiet
-	outp(SNReg, command);
 }
 
 // Sets an SN voice with volume
@@ -116,6 +104,20 @@ void SetPCjrAudioVolume(uint8_t chan, uint8_t volume)
 	command |= 0x90;	// tell chip we're selecting a reg for volume
 	command |= volume ^ 0xF;	// adjust to attenuation; register expects 0 = full, 15 = quiet
 	outp(SNReg, command);
+}
+
+// Sets an SN voice with volume and a desired frequency
+// volume is 0-15
+void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
+{
+	uint16_t period = 0;
+	
+	if (freq != 0)
+		period = SNFreq / (32*freq);
+	
+	SetPCjrAudioPeriod(chan, period);
+
+	SetPCjrAudioVolume(chan, volume);
 }
 
 void ClosePCjrAudio(void)
@@ -290,7 +292,13 @@ void PlayTick(void)
 				pPos++;
 				break;
 			case 0x50:
-				outp(SNReg, *pPos++);
+				// Filter out channel 2
+				if ((*pPos & 0x60) != 0x40)
+					outp(SNReg, *pPos);
+				else if ((*pPos & 0x10) == 0)
+					pPos += 2;
+				
+				pPos++;
 				break;
 			case 0x66:
 				// end of VGM data
@@ -329,8 +337,25 @@ int ticksLeft = 0;
 int tickRate = FRAMETICKS;
 int lastTickRate = FRAMETICKS;
 
+uint8_t samples[256];
+uint8_t* pSample = samples;
+uint8_t* pSampleEnd = &samples[256];
+
+void InitSample(void)
+{
+	int i;
+	
+	for (i = 0; i < 256; i++)
+		samples[i] = (sin((i*M_PI*2.0*32)/256.0)*7.5) + 7.5;
+}
+
 void interrupt Handler(void)
 {
+	// Play 1 sample
+	SetPCjrAudioVolume(2, *pSample);
+	if (++pSample >= pSampleEnd)
+		pSample = samples;
+	
 	ticksLeft -= lastTickRate;
 
 	if (ticksLeft < 0)
@@ -498,7 +523,14 @@ int main(int argc, char* argv[])
 	outp(0x43, 0x34);
 	
 	pPos = pVGM + idx;
-
+	
+	// Set up channels to play samples, by setting frequency 0
+	SetPCjrAudio(0,0,15);
+	SetPCjrAudio(1,0,15);
+	SetPCjrAudio(2,0,15);
+	
+	InitSample();
+	
 	//PlayBuffer(pPos);
 	InitHandler();
 	
