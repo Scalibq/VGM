@@ -341,12 +341,33 @@ uint8_t samples[256];
 uint8_t* pSample = samples;
 uint8_t* pSampleEnd = &samples[256];
 
+// A drop of 2dB will correspond to a ratio of 10-0.1 = 0.79432823 between the current and previous output values.
+// So linear output level of volume V is MAX_OUTPUT*(0.79432823^V) with V in (0..15), 0 being the loudest, and 15 silence.
+// In this table, we take MAX_OUTPUT = 32767.
+int volume_table[16] =
+{
+	32767, 26028, 20675, 16422, 13045, 10362,  8231,  6568,
+	 5193,  4125,  3277,  2603,  2067,  1642,  1304,     0
+};
+
+// MAX_OUTPUT*(0.79432823^V) = Y
+// Solve for V:
+// (0.79432823^V) = Y/MAX_OUTPUT
+// V = log(Y/MAX_OUTPUT)/log(0.79432823)
 void InitSample(void)
 {
 	int i;
 	
 	for (i = 0; i < 256; i++)
-		samples[i] = (sin((i*M_PI*2.0*32)/256.0)*7.5) + 7.5;
+	{
+		double s = sin((i*M_PI*2.0*16)/256.0) + 1;
+		if (s > 0)
+			s = log(s/2.0)/log(0.79432823);
+		else
+			s = 15;
+		
+		samples[i] = 15 - min(15, max(s, 0));
+	}
 }
 
 void interrupt Handler(void)
