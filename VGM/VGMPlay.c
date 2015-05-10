@@ -508,12 +508,24 @@ int main(int argc, char* argv[])
 		
 		if (keypressed(&key))
 		{
-			if (key == '1')
-				tickRate += 100;
-			else if (key == '2')
-				tickRate -= 100;
-			else if (key == '3')
-				playing = 0;
+			switch(key)
+			{
+				case '1':
+					tickRate += 100;
+					break;
+				case '2':
+					tickRate -= 100;
+					break;
+				case '3':
+					playing = 0;
+					break;
+				case '4':
+					tickRate = 19912;
+					break;
+				case '5':
+					tickRate = 2000;
+					break;
+			}
 			
 			SetTimerCount(tickRate);
 			printf("Tickrate: %d\n", tickRate);
