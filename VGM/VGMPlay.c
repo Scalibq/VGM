@@ -102,7 +102,7 @@ void SetPCjrAudioVolume(uint8_t chan, uint8_t volume)
     // set the volume
 	command = chan << 5;	// get voice reg in place
 	command |= 0x90;	// tell chip we're selecting a reg for volume
-	command |= volume ^ 0xF;	// adjust to attenuation; register expects 0 = full, 15 = quiet
+	command |= volume;	// adjust to attenuation; register expects 0 = full, 15 = quiet
 	outp(SNReg, command);
 }
 
@@ -125,10 +125,10 @@ void ClosePCjrAudio(void)
 	uint8_t chan, mplx;
 
 	for (chan = 0; chan < 3; chan++)
-		SetPCjrAudio(chan,440,0);
+		SetPCjrAudio(chan,440,15);
 
 	// Disable noise channel
-	SetPCjrAudioVolume(3,0);
+	SetPCjrAudioVolume(3,15);
 
 	// Reset the multiplexor
 	mplx = inp(SNMplxr);
@@ -366,7 +366,7 @@ void InitSample(void)
 		else
 			s = 15;
 		
-		samples[i] = 15 - min(15, max(s, 0));
+		samples[i] = min(15, max(s, 0));
 	}
 }
 
