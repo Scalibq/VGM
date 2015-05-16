@@ -4,6 +4,7 @@
 #include <dos.h>
 #include <conio.h>
 #include <math.h>
+#include <malloc.h>
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -365,10 +366,10 @@ void InitSample(void)
 	
 	pFile = fopen("sample.raw", "rb");
 	fseek(pFile, 0, SEEK_END);
-	len = min(ftell(pFile)/2L, 8192);
+	len = ftell(pFile);
 	fseek(pFile, 0, SEEK_SET);
 		
-	pSampleBuffer = (uint8_t*)malloc(len);
+	pSampleBuffer = (uint8_t far*)_fmalloc(len);
 	pSample = pSampleBuffer;
 	pSampleEnd = pSampleBuffer+len;
 	
@@ -385,7 +386,10 @@ void InitSample(void)
 //#define MAX_VALUE 2.0
 			//double s = sin((i*M_PI*2.0*16)/len) + 1;
 #define MAX_VALUE 65535
-			uint16_t s = buf[i] + 32768;
+			int32_t s = buf[i] + 32768;
+
+			/*s >>= 8+4;
+			s = 15-s;*/
 			
 			if (s > 0)
 				s = log(s/(double)MAX_VALUE)*iLog;
@@ -407,7 +411,7 @@ void DeinitSample(void)
 {
 	if (pSampleBuffer != NULL)
 	{
-		free(pSampleBuffer);
+		_ffree(pSampleBuffer);
 		pSampleBuffer = NULL;
 		pSample = NULL;
 		pSampleEnd = NULL;
