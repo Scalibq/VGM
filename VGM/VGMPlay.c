@@ -279,7 +279,7 @@ void PlayBuffer(uint8_t* pPos)
 }
 
 int playing = 1;
-uint8_t* pPos = NULL;
+uint8_t far* pPos = NULL;
 
 void PlayTick(void)
 {
@@ -317,7 +317,7 @@ void PlayTick(void)
 endTick:;
 }
 
-void PlayBufferTicks(uint8_t* _pPos)
+void PlayBufferTicks(uint8_t far* _pPos)
 {
 	pPos = _pPos;
 	
@@ -337,9 +337,9 @@ int ticksLeft = 0;
 int tickRate = FRAMETICKS;
 int lastTickRate = FRAMETICKS;
 
-uint8_t samples[256];
-uint8_t* pSample = samples;
-uint8_t* pSampleEnd = &samples[256];
+uint8_t far* pSampleBuffer;
+uint8_t far* pSample;
+uint8_t far* pSampleEnd;
 
 // A drop of 2dB will correspond to a ratio of 10-0.1 = 0.79432823 between the current and previous output values.
 // So linear output level of volume V is MAX_OUTPUT*(0.79432823^V) with V in (0..15), 0 being the loudest, and 15 silence.
@@ -350,6 +350,8 @@ int volume_table[16] =
 	 5193,  4125,  3277,  2603,  2067,  1642,  1304,     0
 };
 
+int16_t buf[1024];
+
 // MAX_OUTPUT*(0.79432823^V) = Y
 // Solve for V:
 // (0.79432823^V) = Y/MAX_OUTPUT
@@ -357,16 +359,58 @@ int volume_table[16] =
 void InitSample(void)
 {
 	int i;
+	size_t len;
+	FILE* pFile;
+	float iLog;
 	
-	for (i = 0; i < 256; i++)
-	{
-		double s = sin((i*M_PI*2.0*16)/256.0) + 1;
-		if (s > 0)
-			s = log(s/2.0)/log(0.79432823);
-		else
-			s = 15;
+	pFile = fopen("sample.raw", "rb");
+	fseek(pFile, 0, SEEK_END);
+	len = min(ftell(pFile)/2L, 8192);
+	fseek(pFile, 0, SEEK_SET);
 		
-		samples[i] = min(15, max(s, 0));
+	pSampleBuffer = (uint8_t*)malloc(len);
+	pSample = pSampleBuffer;
+	pSampleEnd = pSampleBuffer+len;
+	
+	iLog = (float)(1.0f/log(0.79432823));
+	
+	while (len > 0)
+	{
+		size_t chunk = min(len, (sizeof(buf)/sizeof(buf[0])));
+		
+		fread(buf, chunk, 2, pFile);
+
+		for (i = 0; i < chunk; i++)
+		{
+//#define MAX_VALUE 2.0
+			//double s = sin((i*M_PI*2.0*16)/len) + 1;
+#define MAX_VALUE 65535
+			uint16_t s = buf[i] + 32768;
+			
+			if (s > 0)
+				s = log(s/(double)MAX_VALUE)*iLog;
+			else
+				s = 15;
+			
+			*pSample++ = min(15, max(s, 0));
+		}
+		
+		len -= chunk;
+	}
+	
+	fclose(pFile);
+
+	pSample = pSampleBuffer;
+}
+
+void DeinitSample(void)
+{
+	if (pSampleBuffer != NULL)
+	{
+		free(pSampleBuffer);
+		pSampleBuffer = NULL;
+		pSample = NULL;
+		pSampleEnd = NULL;
 	}
 }
 
@@ -375,7 +419,7 @@ void interrupt Handler(void)
 	// Play 1 sample
 	SetPCjrAudioVolume(2, *pSample);
 	if (++pSample >= pSampleEnd)
-		pSample = samples;
+		pSample = pSampleBuffer;
 	
 	ticksLeft -= lastTickRate;
 
@@ -388,7 +432,7 @@ void interrupt Handler(void)
 		// Acknowledge timer
 		outp(0x20, 0x20);
 
-		PlayTick();
+		//PlayTick();
 	}
 	else
 	{
@@ -586,6 +630,8 @@ int main(int argc, char* argv[])
 	}
 	
 	DeinitHandler();
+	
+	DeinitSample();
  
 	free(pVGM);
 
