@@ -366,7 +366,7 @@ void InitSample(void)
 	
 	pFile = fopen("sample.raw", "rb");
 	fseek(pFile, 0, SEEK_END);
-	len = ftell(pFile);
+	len = ftell(pFile)/2L;
 	fseek(pFile, 0, SEEK_SET);
 		
 	pSampleBuffer = (uint8_t far*)_fmalloc(len);
@@ -386,7 +386,7 @@ void InitSample(void)
 //#define MAX_VALUE 2.0
 			//double s = sin((i*M_PI*2.0*16)/len) + 1;
 #define MAX_VALUE 65535
-			int32_t s = buf[i] + 32768;
+			uint16_t s = buf[i] + 32768;
 
 			/*s >>= 8+4;
 			s = 15-s;*/
@@ -436,7 +436,7 @@ void interrupt Handler(void)
 		// Acknowledge timer
 		outp(0x20, 0x20);
 
-		//PlayTick();
+		PlayTick();
 	}
 	else
 	{
@@ -474,7 +474,7 @@ void SetTimerCount(uint16_t rate)
 
 void InitHandler(void)
 {
-	tickRate = 2000;//PITfreq/60;
+	tickRate = PITfreq/8000;
 	lastTickRate = tickRate;
 	
 	SetTimerRate(tickRate);	// Play at 60 Hz
