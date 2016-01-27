@@ -5,6 +5,7 @@
 #include <conio.h>
 #include <math.h>
 #include <malloc.h>
+#include "8259A.h"
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -135,6 +136,16 @@ void ClosePCjrAudio(void)
 	mplx = inp(SNMplxr);
 	mplx &= 0x9C;	// clear 6 and 5 to route PC speaker through multiplexor; 1 and 0 turn off timer signal
 	outp(SNMplxr, mplx);
+}
+
+void InitPCSpeaker(void)
+{
+	
+}
+
+void ClosePCSpeaker(void)
+{
+	
 }
 
 #define iMC_Chan0 0
@@ -357,7 +368,7 @@ int16_t buf[1024];
 // Solve for V:
 // (0.79432823^V) = Y/MAX_OUTPUT
 // V = log(Y/MAX_OUTPUT)/log(0.79432823)
-void InitSample(void)
+void InitSampleSN76489(void)
 {
 	int i;
 	size_t len;
@@ -407,6 +418,12 @@ void InitSample(void)
 	pSample = pSampleBuffer;
 }
 
+// Resample to 1-bit PWM
+void InitSamplePIT(void)
+{
+	
+}
+
 void DeinitSample(void)
 {
 	if (pSampleBuffer != NULL)
@@ -434,16 +451,16 @@ void interrupt Handler(void)
 		lastTickRate = tickRate;
 		
 		// Acknowledge timer
-		outp(0x20, 0x20);
+		//outp(0x20, 0x20);
 
-		PlayTick();
+		//PlayTick();
 	}
 	else
 	{
 		lastTickRate = tickRate;
 		
 		// Acknowledge timer
-		outp(0x20, 0x20);
+		//outp(0x20, 0x20);
 	}
 }
 
@@ -497,6 +514,8 @@ void DeinitHandler(void)
 
 	_dos_setvect(0x8, Old1C);
 }
+
+MachineType machineType;
 
 int main(int argc, char* argv[])
 {
@@ -577,11 +596,18 @@ int main(int argc, char* argv[])
     writeln;
   end;*/
 
+	// Setup auto-EOI
+	machineType = GetMachineType();
+	
+	SetAutoEOI(machineType);
+  
+
 	// Start playing.  Use polling method as we are not trying to be fancy
 	// at this stage, just trying to get something working}
 
-	InitPCjrAudio();
+	//InitPCjrAudio();
 	//SetPCjrAudio(1,440,15);
+	InitPCSpeaker();
 
 	// init PIT channel 0, 3=access mode lobyte/hibyte, mode 2, 16-bit binary}
 	// We do this so we can get a sensible countdown value from mode 2 instead
@@ -598,7 +624,8 @@ int main(int argc, char* argv[])
 	SetPCjrAudio(1,0,15);
 	SetPCjrAudio(2,0,15);
 	
-	InitSample();
+	//InitSampleSN76489();
+	InitSamplePIT();
 	
 	//PlayBuffer(pPos);
 	InitHandler();
@@ -635,11 +662,14 @@ int main(int argc, char* argv[])
 	
 	DeinitHandler();
 	
+	RestorePICState(machineType);
+	
 	DeinitSample();
  
 	free(pVGM);
 
-	ClosePCjrAudio();
+	//ClosePCjrAudio();
+	ClosePCSpeaker();
 
 	return 0;
 }
