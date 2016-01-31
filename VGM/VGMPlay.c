@@ -38,6 +38,30 @@ typedef struct
 #define SampleRate 44100
 #define PITfreq 1193182l
 
+#define PPIPORTB 0x61
+
+// 8253 PIT Mode control (port 0x43) values
+
+#define TIMER0 0x00
+#define TIMER1 0x40
+#define TIMER2 0x80
+
+#define LATCH  0x00
+#define LSB    0x10
+#define MSB    0x20
+#define BOTH   0x30 // LSB first, then MSB
+
+#define MODE0  0x00 // Interrupt on terminal count: low during countdown then high                            (useful for PWM)
+#define MODE1  0x02 // Programmable one shot      : low from gate rising to end of countdown
+#define MODE2  0x04 // Rate generator             : output low for one cycle out of N                         (useful for timing things)
+#define MODE3  0x06 // Square wave generator      : high for ceil(n/2) and low for floor(n/2)                 (useful for beepy sounds)
+#define MODE4  0x08 // Software triggered strobe  : high during countdown then low for one cycle
+#define MODE5  0x0A // Hardware triggered strobe  : wait for gate rising, then high during countdown, then low for one cycle
+
+#define BINARY 0x00
+#define BCD    0x01
+
+
 void InitPCjrAudio(void)
 {
 	uint8_t mplx;
@@ -140,18 +164,27 @@ void ClosePCjrAudio(void)
 
 void InitPCSpeaker(void)
 {
+	// Enable speaker and tie input pin to CTC Chan 2 by setting bits 1 and 0
+	uint8_t ppi = inp(PPIPORTB);
+	ppi |= 0x3;
+	outp(PPIPORTB, ppi);
 	
+	outp(0x43, TIMER2 | LSB | MODE0 | BINARY);
+	outp(0x42, 0x01);	// Counter 2 count = 1 - terminate count quickly
 }
 
 void ClosePCSpeaker(void)
 {
+	// Disable speaker by clearing bits 1 and 0
+	uint8_t ppi = inp(PPIPORTB);
+	ppi &= ~0x3;
+	outp(PPIPORTB, ppi);
 	
+	// Reset timer
+	outp(0x43, TIMER2 | BOTH | MODE3 | BINARY);
+	outp(0x42, 0);
+	outp(0x42, 0);
 }
-
-#define iMC_Chan0 0
-#define iMC_LatchCounter 0
-#define iMC_OpMode2 0x4
-#define iMC_BinaryMode 0
 
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
 void tickWait(uint16_t numTicks)
@@ -162,7 +195,7 @@ void tickWait(uint16_t numTicks)
 	_disable();
 	
 	// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-	outp(0x43, iMC_Chan0);
+	outp(0x43, TIMER0 | LATCH | MODE2 | BINARY);
 	
 	// Get LSB of timer counter
 	startTime = inp(0x40);
@@ -178,7 +211,7 @@ void tickWait(uint16_t numTicks)
 		_disable();
 
 		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-		outp(0x43, iMC_Chan0);
+		outp(0x43, TIMER0 | LATCH | MODE2 | BINARY);
 		
 		// Get LSB of timer counter
 		time = inp(0x40);
@@ -421,7 +454,45 @@ void InitSampleSN76489(void)
 // Resample to 1-bit PWM
 void InitSamplePIT(void)
 {
+	int i;
+	size_t len;
+	FILE* pFile;
+	float iLog;
 	
+	pFile = fopen("sample.raw", "rb");
+	fseek(pFile, 0, SEEK_END);
+	len = ftell(pFile)/2L;
+	fseek(pFile, 0, SEEK_SET);
+		
+	pSampleBuffer = (uint8_t far*)_fmalloc(len);
+	pSample = pSampleBuffer;
+	pSampleEnd = pSampleBuffer+len;
+	
+	iLog = (float)(1.0f/log(0.79432823));
+	
+	while (len > 0)
+	{
+		size_t chunk = min(len, (sizeof(buf)/sizeof(buf[0])));
+		
+		fread(buf, chunk, 2, pFile);
+
+		for (i = 0; i < chunk; i++)
+		{
+			// Make unsigned 16-bit sample
+			uint16_t s = buf[i] + 32768;
+			
+			// Scale to PIT-range
+			s >>= 11;
+
+			*pSample++ = s + 1;
+		}
+		
+		len -= chunk;
+	}
+	
+	fclose(pFile);
+
+	pSample = pSampleBuffer;
 }
 
 void DeinitSample(void)
@@ -438,7 +509,8 @@ void DeinitSample(void)
 void interrupt Handler(void)
 {
 	// Play 1 sample
-	SetPCjrAudioVolume(2, *pSample);
+	//SetPCjrAudioVolume(2, *pSample);
+	outp(0x42, *pSample);
 	if (++pSample >= pSampleEnd)
 		pSample = pSampleBuffer;
 	
