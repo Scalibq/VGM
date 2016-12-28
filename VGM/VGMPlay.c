@@ -832,7 +832,7 @@ int main(int argc, char* argv[])
 	// Start playing.  Use polling method as we are not trying to be fancy
 	// at this stage, just trying to get something working}
 
-	InitPCjrAudio();
+	//InitPCjrAudio();
 	//SetPCjrAudio(1,440,15);
 	//InitPCSpeaker();
 
