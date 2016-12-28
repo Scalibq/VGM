@@ -82,13 +82,11 @@ void SetPCjrAudioPeriod(uint8_t chan, uint16_t period)
 	command |= 0x80;		// tell chip we are selecting a reg
 	command |= (period & 0xF);	// grab least sig 4 bits of period...
 	outp(SNReg,command);
-	//__asm int 0xC0
 	
     // build LSB
 	command = period >> 4;	// isolate upper 6 bits
 	//command &= 0x7F;		// clear bit 7 to indicate rest of freq
     outp(SNReg,command);
-	//__asm int 0xC0
 }
 
 // Sets an SN voice with volume
@@ -110,7 +108,6 @@ void SetPCjrAudioVolume(uint8_t chan, uint8_t volume)
 	command |= 0x90;	// tell chip we're selecting a reg for volume
 	command |= volume;	// adjust to attenuation; register expects 0 = full, 15 = quiet
 	outp(SNReg, command);
-	//__asm int 0xC0
 }
 
 // Sets an SN voice with volume and a desired frequency
@@ -307,6 +304,9 @@ int playing = 1;
 uint8_t far* pPos = NULL;
 uint32_t currentTime;
 
+void PlayTick(void);
+void DoDelay(void);
+
 void PlayBuffer()
 {
 	// Disable interrupts
@@ -329,21 +329,39 @@ void PlayBuffer()
 
 	while (playing)
 	{
+		// Loop through all command-data
+		PlayTick();
+		
+		// Step back to delay command
+		--pPos;
+		
+		// Now perform waiting
+		DoDelay();
+
+		// handle input
+		if (keypressed(NULL))
+			playing = 0;
+	}
+}
+
+void PlayTick(void)
+{
+	while (1)
+	{
 		switch (*pPos++)
 		{
+			// SN76489 commands
 			case 0x4F:	// dd : Game Gear PSG stereo, write dd to port 0x06
 				// stereo PSG cmd, ignored
 				pPos++;
 				break;
 			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
-				outp(SNReg, *pPos++);
-				/*{
-					byte s = *pPos++;
-					__asm{
-						mov al, [s]
-						int 0xC0
-					}
-				}*/
+				// Filter out channel 2, use for samples
+				//if ((*pPos & 0x60) != 0x40)
+					outp(SNReg, *pPos);
+				//else if ((*pPos & 0x10) == 0)
+				//	pPos += 2;
+				pPos++;
 				break;
 			case 0x51:	// aa dd : YM2413, write value dd to register aa
 			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
@@ -363,137 +381,30 @@ void PlayBuffer()
 				// Skip
 				pPos += 2;
 				break;
-			case 0x61:
-				// wait n samples
-				{
-					uint16_t* pW;
-					uint16_t w;
-					
-					pW = (uint16_t*)pPos;
-					w = *pW++;
-					// max reasonable tickWait time is 50ms, so handle larger values in slices
-					while (w > (SampleRate / 20))
-					{
-						currentTime = tickWait(PITFREQ / 20, currentTime);
-						w -= (SampleRate / 20);
-					};
-					
-					currentTime = tickWait(PITFREQ / (SampleRate / w), currentTime);
-					pPos = (uint8_t*)pW;
-					break;
-				}
-			case 0x62:
-				// wait 1/60th second
-				{
-					uint32_t wait = PITFREQ / 60L;
-					
-					currentTime = tickWait(wait, currentTime);
-					break;
-				}
-			case 0x63:
-				// wait 1/50th second
-				{
-					uint32_t wait = PITFREQ / 50L;
-				
-					currentTime = tickWait(wait, currentTime);
-					break;
-				}
+
 			case 0x66:
 				// end of VGM data
 				playing = 0;
-				break;
+				
+			// Wait-commands
+			case 0x62:	// wait 1/60th second
+			case 0x63:	// wait 1/50th second
 			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate), currentTime);
-				break;
 			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 2), currentTime);
-				break;
 			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 3), currentTime);
-				break;
 			case 0x73:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 4), currentTime);
-				break;
 			case 0x74:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 5), currentTime);
-				break;
 			case 0x75:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 6), currentTime);
-				break;
 			case 0x76:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 7), currentTime);
-				break;
 			case 0x77:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 8), currentTime);
-				break;
 			case 0x78:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 9), currentTime);
-				break;
 			case 0x79:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 10), currentTime);
-				break;
 			case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 11), currentTime);
-				break;
 			case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 12), currentTime);
-				break;
 			case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 13), currentTime);
-				break;
 			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 14), currentTime);
-				break;
 			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 15), currentTime);
-				break;
 			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
-				currentTime = tickWait(PITFREQ / (SampleRate / 16), currentTime);
-				break;
-			default:
-				printf("Invalid: %02X\n", *(pPos-1));
-				break;
-		}
-
-		// handle input
-		if (keypressed(NULL))
-			playing = 0;
-	}
-}
-
-void PlayTick(void)
-{
-	while (1)
-	{
-		switch (*pPos++)
-		{
-			case 0x4f:
-				// stereo PSG cmd, ignored
-				pPos++;
-				break;
-			case 0x50:
-				// Filter out channel 2
-				//if ((*pPos & 0x60) != 0x40)
-					outp(SNReg, *pPos);
-					/*{
-						byte s = *pPos;
-						__asm{
-							mov al, [s]
-							int 0xC0
-						}
-					}*/
-				//else if ((*pPos & 0x10) == 0)
-				//	pPos += 2;
-				
-				pPos++;
-				break;
-			case 0x66:
-				// end of VGM data
-				playing = 0;
-			case 0x62:
-				// wait 1/60th second
-			case 0x63:
-				// wait 1/50th second
 				goto endTick;
 				break;
 			default:
@@ -502,6 +413,105 @@ void PlayTick(void)
 		}
 	}
 endTick:;
+}
+
+void DoDelay(void)
+{
+	switch (*pPos++)
+	{
+		case 0x61:
+			// wait n samples
+			{
+				uint16_t* pW;
+				uint16_t w;
+				
+				pW = (uint16_t*)pPos;
+				w = *pW++;
+				// max reasonable tickWait time is 50ms, so handle larger values in slices
+				while (w > (SampleRate / 20))
+				{
+					currentTime = tickWait(PITFREQ / 20, currentTime);
+					w -= (SampleRate / 20);
+				};
+				
+				currentTime = tickWait(PITFREQ / (SampleRate / w), currentTime);
+				pPos = (uint8_t*)pW;
+				break;
+			}
+		case 0x62:
+			// wait 1/60th second
+			{
+				uint32_t wait = PITFREQ / 60L;
+				
+				currentTime = tickWait(wait, currentTime);
+				break;
+			}
+		case 0x63:
+			// wait 1/50th second
+			{
+				uint32_t wait = PITFREQ / 50L;
+			
+				currentTime = tickWait(wait, currentTime);
+				break;
+			}
+		case 0x70:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate), currentTime);
+			break;
+		case 0x71:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 2), currentTime);
+			break;
+		case 0x72:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 3), currentTime);
+			break;
+		case 0x73:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 4), currentTime);
+			break;
+		case 0x74:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 5), currentTime);
+			break;
+		case 0x75:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 6), currentTime);
+			break;
+		case 0x76:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 7), currentTime);
+			break;
+		case 0x77:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 8), currentTime);
+			break;
+		case 0x78:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 9), currentTime);
+			break;
+		case 0x79:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 10), currentTime);
+			break;
+		case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 11), currentTime);
+			break;
+		case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 12), currentTime);
+			break;
+		case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 13), currentTime);
+			break;
+		case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 14), currentTime);
+			break;
+		case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 15), currentTime);
+			break;
+		case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
+			currentTime = tickWait(PITFREQ / (SampleRate / 16), currentTime);
+			break;
+
+		case 0x66:
+			// end of VGM data
+			playing = 0;
+			break;
+
+		default:
+			printf("Invalid: %02X\n", *(pPos-1));
+			break;
+	}
 }
 
 void PlayBufferTicks()
