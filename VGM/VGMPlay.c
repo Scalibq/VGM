@@ -305,7 +305,7 @@ uint8_t far* pPos = NULL;
 uint32_t currentTime;
 
 void PlayTick(void);
-void DoDelay(void);
+uint16_t GetDelay(void);
 
 void PlayBuffer()
 {
@@ -329,6 +329,8 @@ void PlayBuffer()
 
 	while (playing)
 	{
+		uint16_t delay;
+		
 		// Loop through all command-data
 		PlayTick();
 		
@@ -336,7 +338,17 @@ void PlayBuffer()
 		--pPos;
 		
 		// Now perform waiting
-		DoDelay();
+		delay = GetDelay();
+		
+		// max reasonable tickWait time is 50ms, so handle larger values in slices
+		while (delay > (SampleRate / 20))
+		{
+			currentTime = tickWait(PITFREQ / 20, currentTime);
+			delay -= (SampleRate / 20);
+		};
+		
+		if (delay > 0)				
+			currentTime = tickWait(PITFREQ / (SampleRate / delay), currentTime);
 
 		// handle input
 		if (keypressed(NULL))
@@ -416,89 +428,75 @@ void PlayTick(void)
 endTick:;
 }
 
-void DoDelay(void)
+// Delay in nr of samples (at samplerate of VGM file, usually 44100 Hz)
+uint16_t GetDelay(void)
 {
+	uint16_t delay = 0;
+	
 	switch (*pPos++)
 	{
 		case 0x61:	// wait n samples
 			{
 				uint16_t* pW;
-				uint16_t w;
 				
 				pW = (uint16_t*)pPos;
-				w = *pW++;
-				// max reasonable tickWait time is 50ms, so handle larger values in slices
-				while (w > (SampleRate / 20))
-				{
-					currentTime = tickWait(PITFREQ / 20, currentTime);
-					w -= (SampleRate / 20);
-				};
-				
-				currentTime = tickWait(PITFREQ / (SampleRate / w), currentTime);
+				delay = *pW++;
 				pPos = (uint8_t*)pW;
 				break;
 			}
 		case 0x62:	// wait 1/60th second
-			{
-				uint32_t wait = PITFREQ / 60L;
-				
-				currentTime = tickWait(wait, currentTime);
-				break;
-			}
+			delay = (SampleRate / 60);
+			break;
 		case 0x63:	// wait 1/50th second
-			{
-				uint32_t wait = PITFREQ / 50L;
-			
-				currentTime = tickWait(wait, currentTime);
-				break;
-			}
+			delay = (SampleRate / 50);
+			break;
 		case 0x70:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate), currentTime);
+			delay = 1;
 			break;
 		case 0x71:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 2), currentTime);
+			delay = 2;
 			break;
 		case 0x72:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 3), currentTime);
+			delay = 3;
 			break;
 		case 0x73:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 4), currentTime);
+			delay = 4;
 			break;
 		case 0x74:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 5), currentTime);
+			delay = 5;
 			break;
 		case 0x75:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 6), currentTime);
+			delay = 6;
 			break;
 		case 0x76:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 7), currentTime);
+			delay = 7;
 			break;
 		case 0x77:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 8), currentTime);
+			delay = 8;
 			break;
 		case 0x78:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 9), currentTime);
+			delay = 9;
 			break;
 		case 0x79:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 10), currentTime);
+			delay = 10;
 			break;
 		case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 11), currentTime);
+			delay = 11;
 			break;
 		case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 12), currentTime);
+			delay = 12;
 			break;
 		case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 13), currentTime);
+			delay = 13;
 			break;
 		case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 14), currentTime);
+			delay = 14;
 			break;
 		case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 15), currentTime);
+			delay = 15;
 			break;
 		case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
-			currentTime = tickWait(PITFREQ / (SampleRate / 16), currentTime);
+			delay = 16;
 			break;
 
 		case 0x66:
@@ -510,6 +508,8 @@ void DoDelay(void)
 			printf("DoDelay(): Invalid: %02X\n", *(pPos-1));
 			break;
 	}
+	
+	return delay;
 }
 
 void PlayBufferTicks()
