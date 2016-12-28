@@ -387,6 +387,7 @@ void PlayTick(void)
 				playing = 0;
 				
 			// Wait-commands
+			case 0x61:	// wait n samples
 			case 0x62:	// wait 1/60th second
 			case 0x63:	// wait 1/50th second
 			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
@@ -408,7 +409,7 @@ void PlayTick(void)
 				goto endTick;
 				break;
 			default:
-				printf("Invalid: %02X\n", *(pPos-1));
+				printf("PlayTick(): Invalid: %02X\n", *(pPos-1));
 				break;
 		}
 	}
@@ -419,8 +420,7 @@ void DoDelay(void)
 {
 	switch (*pPos++)
 	{
-		case 0x61:
-			// wait n samples
+		case 0x61:	// wait n samples
 			{
 				uint16_t* pW;
 				uint16_t w;
@@ -438,16 +438,14 @@ void DoDelay(void)
 				pPos = (uint8_t*)pW;
 				break;
 			}
-		case 0x62:
-			// wait 1/60th second
+		case 0x62:	// wait 1/60th second
 			{
 				uint32_t wait = PITFREQ / 60L;
 				
 				currentTime = tickWait(wait, currentTime);
 				break;
 			}
-		case 0x63:
-			// wait 1/50th second
+		case 0x63:	// wait 1/50th second
 			{
 				uint32_t wait = PITFREQ / 50L;
 			
@@ -509,7 +507,7 @@ void DoDelay(void)
 			break;
 
 		default:
-			printf("Invalid: %02X\n", *(pPos-1));
+			printf("DoDelay(): Invalid: %02X\n", *(pPos-1));
 			break;
 	}
 }
