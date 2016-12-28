@@ -1,21 +1,23 @@
 !define BLANK ""
-I:\Programming\Oldskool\DOS\VGM\8259A.obj : I:\Programming\Oldskool\DOS\VGM\&
-8259A.C .AUTODEPEND
+I:\Programming\Oldskool\DOS\VGM\8259A.obj : I:\Programming\Oldskool\DOS\COMM&
+ON\C\8259A.C .AUTODEPEND
  @I:
  cd I:\Programming\Oldskool\DOS\VGM
- *wcc 8259A.C -i="I:\WATCOM/h" -w4 -e25 -zp1 -zq -od -d2 -bt=dos -fo=.obj -m&
-s
+ *wcc ..\COMMON\C\8259A.C -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -z&
+q -od -d2 -bt=dos -fo=.obj -ms
 
 I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj : I:\Programming\Oldskool\DOS\VG&
 M\VGMPlay.c .AUTODEPEND
  @I:
  cd I:\Programming\Oldskool\DOS\VGM
- *wcc VGMPlay.c -i="I:\WATCOM/h" -w4 -e25 -zp1 -zq -od -d2 -bt=dos -fo=.obj &
--ms
+ *wcc VGMPlay.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq -od -d2 &
+-bt=dos -fo=.obj -ms
 
 I:\Programming\Oldskool\DOS\VGM\VGMPlay.exe : I:\Programming\Oldskool\DOS\VG&
 M\8259A.obj I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj I:\Programming\Oldsk&
-ool\DOS\VGM\8259A.H I:\Programming\Oldskool\DOS\VGM\TYPES.H .AUTODEPEND
+ool\DOS\COMMON\C\8253.h I:\Programming\Oldskool\DOS\COMMON\C\8259A.H I:\Prog&
+ramming\Oldskool\DOS\COMMON\C\COMMON.H I:\Programming\Oldskool\DOS\COMMON\C\&
+TYPES.H .AUTODEPEND
  @I:
  cd I:\Programming\Oldskool\DOS\VGM
  @%write VGMPlay.lk1 FIL 8259A.obj,VGMPlay.obj

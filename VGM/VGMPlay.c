@@ -5,6 +5,7 @@
 #include <conio.h>
 #include <math.h>
 #include <malloc.h>
+#include "8253.h"
 #include "8259A.h"
 
 #define M_PI 3.1415926535897932384626433832795
@@ -32,35 +33,12 @@ typedef struct
 } VGMHeader;
 
 #define VFileIdent 0x206d6756
-#define SNReg 0xC0
+//#define SNReg 0xC0
 #define SNFreq 3579540
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
 #define SampleRate 44100
-#define PITfreq 1193182l
 
-#define PPIPORTB 0x61
-
-// 8253 PIT Mode control (port 0x43) values
-
-#define TIMER0 0x00
-#define TIMER1 0x40
-#define TIMER2 0x80
-
-#define LATCH  0x00
-#define LSB    0x10
-#define MSB    0x20
-#define BOTH   0x30 // LSB first, then MSB
-
-#define MODE0  0x00 // Interrupt on terminal count: low during countdown then high                            (useful for PWM)
-#define MODE1  0x02 // Programmable one shot      : low from gate rising to end of countdown
-#define MODE2  0x04 // Rate generator             : output low for one cycle out of N                         (useful for timing things)
-#define MODE3  0x06 // Square wave generator      : high for ceil(n/2) and low for floor(n/2)                 (useful for beepy sounds)
-#define MODE4  0x08 // Software triggered strobe  : high during countdown then low for one cycle
-#define MODE5  0x0A // Hardware triggered strobe  : wait for gate rising, then high during countdown, then low for one cycle
-
-#define BINARY 0x00
-#define BCD    0x01
-
+uint16_t SNReg = 0xC0;
 
 void InitPCjrAudio(void)
 {
@@ -104,11 +82,13 @@ void SetPCjrAudioPeriod(uint8_t chan, uint16_t period)
 	command |= 0x80;		// tell chip we are selecting a reg
 	command |= (period & 0xF);	// grab least sig 4 bits of period...
 	outp(SNReg,command);
+	//__asm int 0xC0
 	
     // build LSB
 	command = period >> 4;	// isolate upper 6 bits
 	//command &= 0x7F;		// clear bit 7 to indicate rest of freq
     outp(SNReg,command);
+	//__asm int 0xC0
 }
 
 // Sets an SN voice with volume
@@ -130,6 +110,7 @@ void SetPCjrAudioVolume(uint8_t chan, uint8_t volume)
 	command |= 0x90;	// tell chip we're selecting a reg for volume
 	command |= volume;	// adjust to attenuation; register expects 0 = full, 15 = quiet
 	outp(SNReg, command);
+	//__asm int 0xC0
 }
 
 // Sets an SN voice with volume and a desired frequency
@@ -169,8 +150,8 @@ void InitPCSpeaker(void)
 	ppi |= 0x3;
 	outp(PPIPORTB, ppi);
 	
-	outp(0x43, TIMER2 | LSB | MODE0 | BINARY);
-	outp(0x42, 0x01);	// Counter 2 count = 1 - terminate count quickly
+	outp(CTCMODECMDREG, CHAN2 | AMLOBYTE | MODE0 | BINARY);
+	outp(CHAN2PORT, 0x01);	// Counter 2 count = 1 - terminate count quickly
 }
 
 void ClosePCSpeaker(void)
@@ -181,46 +162,124 @@ void ClosePCSpeaker(void)
 	outp(PPIPORTB, ppi);
 	
 	// Reset timer
-	outp(0x43, TIMER2 | BOTH | MODE3 | BINARY);
-	outp(0x42, 0);
-	outp(0x42, 0);
+	outp(CTCMODECMDREG, CHAN2 | AMBOTH | MODE3 | BINARY);
+	outp(CHAN2PORT, 0);
+	outp(CHAN2PORT, 0);
 }
 
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
-void tickWait(uint16_t numTicks)
+typedef union _WordVal
 {
-	uint16_t startTime, time;
+	struct {
+		uint8_t Byte0;
+		uint8_t Byte1;
+	};
+	uint16_t WordPart;
+} WordVal;
+
+typedef union _TimeVal
+{
+	struct {
+		WordVal LowPart;
+		WordVal HighPart;
+	};
+	uint16_t LongPart;	
+} TimeVal;
+
+uint32_t tickWait(uint32_t numTicks, uint32_t currentTime)
+{
+	uint16_t lastTime;
+	uint32_t targetTime;
+	
+	lastTime = currentTime;
+	
+	targetTime = currentTime - numTicks;
+	
+	do
+	{
+		uint16_t time;
+		
+		_disable();
+
+		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
+		outp(CTCMODECMDREG, CHAN0 | AMREAD);
+		
+		// Get LSB of timer counter
+		time = inp(CHAN0PORT);
+		
+		// Get MSB of timer counter
+		time |= ((uint16_t)inp(CHAN0PORT)) << 8;
+		
+		_enable();
+		
+		// Handle wraparound
+		if (time > lastTime)
+		{
+			currentTime -= 0x10000l;
+		}
+		
+		currentTime &= 0xFFFF0000l;
+		currentTime |= time;
+		lastTime = time;
+	} while (currentTime > targetTime);
+	
+	return currentTime;
+}
+
+// Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
+void tickWait2(uint32_t numTicks)
+{
+	WordVal lastTime;
+	TimeVal currentTime, targetTime;
 	
 	// Disable interrupts
 	_disable();
 	
 	// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-	outp(0x43, TIMER0 | LATCH | MODE2 | BINARY);
+	outp(CTCMODECMDREG, CHAN0 | AMREAD);
 	
 	// Get LSB of timer counter
-	startTime = inp(0x40);
+	currentTime.LowPart.Byte0 = inp(CHAN0PORT);
 	
 	// Get MSB of timer counter
-	startTime |= ((uint16_t)inp(0x40)) << 8;
+	currentTime.LowPart.Byte1 = inp(CHAN0PORT);
 	
 	// Re-enable interrupts
 	_enable();
 	
+	lastTime = currentTime.LowPart;
+	
+	// Count down from maximum
+	currentTime.HighPart.WordPart = 0xFFFF;
+	
+	targetTime.LongPart = currentTime.LongPart - numTicks;
+	
 	do
 	{
+		WordVal time;
+		
 		_disable();
 
 		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-		outp(0x43, TIMER0 | LATCH | MODE2 | BINARY);
+		outp(CTCMODECMDREG, CHAN0 | AMREAD);
 		
 		// Get LSB of timer counter
-		time = inp(0x40);
+		time.Byte0 = inp(CHAN0PORT);
 		
 		// Get MSB of timer counter
-		time |= ((uint16_t)inp(0x40)) << 8;
+		time.Byte1 = inp(CHAN0PORT);
 		
 		_enable();
-	} while ((startTime-time) < numTicks);
+		
+		// Handle wraparound
+		if (time.WordPart > lastTime.WordPart)
+		{
+			currentTime.HighPart.WordPart--;
+		}
+		
+		currentTime.LowPart = time;
+		lastTime = time;
+	} while (currentTime.LongPart > targetTime.LongPart);
 }
 
 int keypressed(uint8_t* pChar)
@@ -244,20 +303,65 @@ int keypressed(uint8_t* pChar)
 	return ret;
 }
 
-void PlayBuffer(uint8_t* pPos)
+int playing = 1;
+uint8_t far* pPos = NULL;
+uint32_t currentTime;
+
+void PlayBuffer()
 {
-	int playing = 1;
-		
+	// Disable interrupts
+	_disable();
+	
+	// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
+	outp(CTCMODECMDREG, CHAN0 | AMREAD);
+	
+	// Get LSB of timer counter
+	currentTime = inp(CHAN0PORT);
+	
+	// Get MSB of timer counter
+	currentTime |= ((uint16_t)inp(CHAN0PORT)) << 8;
+	
+	// Re-enable interrupts
+	_enable();
+	
+	// Count down from maximum
+	currentTime |= 0xFFFF0000l;
+
 	while (playing)
 	{
 		switch (*pPos++)
 		{
-			case 0x4f:
+			case 0x4F:	// dd : Game Gear PSG stereo, write dd to port 0x06
 				// stereo PSG cmd, ignored
 				pPos++;
 				break;
-			case 0x50:
+			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
 				outp(SNReg, *pPos++);
+				/*{
+					byte s = *pPos++;
+					__asm{
+						mov al, [s]
+						int 0xC0
+					}
+				}*/
+				break;
+			case 0x51:	// aa dd : YM2413, write value dd to register aa
+			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
+			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
+			case 0x54:	// aa dd : YM2151, write value dd to register aa
+			case 0x55:	// aa dd : YM2203, write value dd to register aa
+			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
+			case 0x57:	// aa dd : YM2608 port 1, write value dd to register aa
+			case 0x58:	// aa dd : YM2610 port 0, write value dd to register aa
+			case 0x59:	// aa dd : YM2610 port 1, write value dd to register aa
+			case 0x5A:	// aa dd : YM3812, write value dd to register aa
+			case 0x5B:	// aa dd : YM3526, write value dd to register aa
+			case 0x5C:	// aa dd : Y8950, write value dd to register aa
+			case 0x5D:	// aa dd : YMZ280B, write value dd to register aa
+			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
+			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
+				// Skip
+				pPos += 2;
 				break;
 			case 0x61:
 				// wait n samples
@@ -265,52 +369,86 @@ void PlayBuffer(uint8_t* pPos)
 					uint16_t* pW;
 					uint16_t w;
 					
-					printf("v\n");	// indicate we're doing a multiframe/variable wait
-					
 					pW = (uint16_t*)pPos;
 					w = *pW++;
 					// max reasonable tickWait time is 50ms, so handle larger values in slices
 					while (w > (SampleRate / 20))
 					{
-						tickWait(PITfreq / 20);
+						currentTime = tickWait(PITFREQ / 20, currentTime);
 						w -= (SampleRate / 20);
 					};
 					
-					tickWait(PITfreq / (SampleRate / w));
+					currentTime = tickWait(PITFREQ / (SampleRate / w), currentTime);
 					pPos = (uint8_t*)pW;
 					break;
 				}
 			case 0x62:
 				// wait 1/60th second
 				{
-					uint32_t wait = PITfreq / 60;
+					uint32_t wait = PITFREQ / 60L;
 					
-					while (wait > 65535)
-					{
-						tickWait(65535);
-						wait -= 65535;
-					}
-					
-					tickWait(wait);
+					currentTime = tickWait(wait, currentTime);
 					break;
 				}
 			case 0x63:
 				// wait 1/50th second
 				{
-					uint32_t wait = PITfreq / 50;
-					
-					while (wait > 65535)
-					{
-						tickWait(65535);
-						wait -= 65535;
-					}
-					
-					tickWait(wait);
+					uint32_t wait = PITFREQ / 50L;
+				
+					currentTime = tickWait(wait, currentTime);
 					break;
 				}
 			case 0x66:
 				// end of VGM data
 				playing = 0;
+				break;
+			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate), currentTime);
+				break;
+			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 2), currentTime);
+				break;
+			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 3), currentTime);
+				break;
+			case 0x73:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 4), currentTime);
+				break;
+			case 0x74:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 5), currentTime);
+				break;
+			case 0x75:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 6), currentTime);
+				break;
+			case 0x76:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 7), currentTime);
+				break;
+			case 0x77:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 8), currentTime);
+				break;
+			case 0x78:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 9), currentTime);
+				break;
+			case 0x79:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 10), currentTime);
+				break;
+			case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 11), currentTime);
+				break;
+			case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 12), currentTime);
+				break;
+			case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 13), currentTime);
+				break;
+			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 14), currentTime);
+				break;
+			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 15), currentTime);
+				break;
+			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
+				currentTime = tickWait(PITFREQ / (SampleRate / 16), currentTime);
 				break;
 			default:
 				printf("Invalid: %02X\n", *(pPos-1));
@@ -322,9 +460,6 @@ void PlayBuffer(uint8_t* pPos)
 			playing = 0;
 	}
 }
-
-int playing = 1;
-uint8_t far* pPos = NULL;
 
 void PlayTick(void)
 {
@@ -338,10 +473,17 @@ void PlayTick(void)
 				break;
 			case 0x50:
 				// Filter out channel 2
-				if ((*pPos & 0x60) != 0x40)
+				//if ((*pPos & 0x60) != 0x40)
 					outp(SNReg, *pPos);
-				else if ((*pPos & 0x10) == 0)
-					pPos += 2;
+					/*{
+						byte s = *pPos;
+						__asm{
+							mov al, [s]
+							int 0xC0
+						}
+					}*/
+				//else if ((*pPos & 0x10) == 0)
+				//	pPos += 2;
 				
 				pPos++;
 				break;
@@ -362,14 +504,13 @@ void PlayTick(void)
 endTick:;
 }
 
-void PlayBufferTicks(uint8_t far* _pPos)
+void PlayBufferTicks()
 {
-	pPos = _pPos;
-	
 	while (playing)
 	{
 		PlayTick();
-		tickWait(PITfreq / 60);
+		
+		currentTime = tickWait(PITFREQ / 60, currentTime);
 
 		// handle input
 		if (keypressed(NULL))
@@ -508,6 +649,13 @@ void DeinitSample(void)
 
 void interrupt Handler(void)
 {
+	PlayTick();
+
+	// Acknowledge timer
+	outp(0x20, 0x20);
+
+	return;
+	
 	// Play 1 sample
 	//SetPCjrAudioVolume(2, *pSample);
 	outp(0x42, *pSample);
@@ -523,7 +671,7 @@ void interrupt Handler(void)
 		lastTickRate = tickRate;
 		
 		// Acknowledge timer
-		//outp(0x20, 0x20);
+		outp(0x20, 0x20);
 
 		//PlayTick();
 	}
@@ -532,7 +680,7 @@ void interrupt Handler(void)
 		lastTickRate = tickRate;
 		
 		// Acknowledge timer
-		//outp(0x20, 0x20);
+		outp(0x20, 0x20);
 	}
 }
 
@@ -563,8 +711,9 @@ void SetTimerCount(uint16_t rate)
 
 void InitHandler(void)
 {
-	tickRate = PITfreq/8000;
-	lastTickRate = tickRate;
+	//tickRate = PITfreq/8000;
+	//lastTickRate = tickRate;
+	tickRate = 19912;
 	
 	SetTimerRate(tickRate);	// Play at 60 Hz
 
@@ -597,9 +746,9 @@ int main(int argc, char* argv[])
 	VGMHeader* pHeader;
 	uint32_t idx;
 	
-	if (argc != 2)
+	if (argc < 2)
 	{
-		printf("Usage: VGMPlay <file>\n");
+		printf("Usage: VGMPlay <file> <port>\n");
 		
 		return 0;
 	}
@@ -612,6 +761,12 @@ int main(int argc, char* argv[])
 		
 		return 0;
 	}
+	
+	// Parse port
+	if (argc > 2)
+		sscanf(argv[2], "%X", &SNReg);
+
+	printf("Using SN76489 at port %Xh\n", SNReg);
 	
 	fseek(pFile, 0, SEEK_END);
 	size = ftell(pFile);
@@ -669,17 +824,17 @@ int main(int argc, char* argv[])
   end;*/
 
 	// Setup auto-EOI
-	machineType = GetMachineType();
+	//machineType = GetMachineType();
 	
-	SetAutoEOI(machineType);
+	//SetAutoEOI(machineType);
   
 
 	// Start playing.  Use polling method as we are not trying to be fancy
 	// at this stage, just trying to get something working}
 
-	//InitPCjrAudio();
+	InitPCjrAudio();
 	//SetPCjrAudio(1,440,15);
-	InitPCSpeaker();
+	//InitPCSpeaker();
 
 	// init PIT channel 0, 3=access mode lobyte/hibyte, mode 2, 16-bit binary}
 	// We do this so we can get a sensible countdown value from mode 2 instead
@@ -692,14 +847,28 @@ int main(int argc, char* argv[])
 	pPos = pVGM + idx;
 	
 	// Set up channels to play samples, by setting frequency 0
-	SetPCjrAudio(0,0,15);
-	SetPCjrAudio(1,0,15);
-	SetPCjrAudio(2,0,15);
+	//SetPCjrAudio(0,0,15);
+	//SetPCjrAudio(1,0,15);
+	//SetPCjrAudio(2,0,15);
 	
 	//InitSampleSN76489();
-	InitSamplePIT();
+	//InitSamplePIT();
+
+	// Polling timer-based replay
+	SetTimerRate(0);
+	PlayBuffer();
+	_disable();
 	
-	//PlayBuffer(pPos);
+	// Return timer to default 18.2 Hz
+	outp(0x43, 0x36);
+	
+	outp(0x40, 0);
+	outp(0x40, 0);
+	
+	_enable();
+	
+	// Int-based replay
+	/*
 	InitHandler();
 	
 	while (playing)
@@ -733,15 +902,25 @@ int main(int argc, char* argv[])
 	}
 	
 	DeinitHandler();
+	*/
 	
-	RestorePICState(machineType);
+	//RestorePICState(machineType);
 	
-	DeinitSample();
+	//DeinitSample();
  
 	free(pVGM);
+	
+	{
+		int chan;
+		for (chan = 0; chan < 3; chan++)
+			SetPCjrAudio(chan,440,15);
+		
+		// Disable noise channel
+		SetPCjrAudioVolume(3,15);
+	}
 
-	//ClosePCjrAudio();
-	ClosePCSpeaker();
+	ClosePCjrAudio();
+	//ClosePCSpeaker();
 
 	return 0;
 }
