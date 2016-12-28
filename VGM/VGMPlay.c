@@ -183,14 +183,14 @@ typedef union _TimeVal
 	uint16_t LongPart;	
 } TimeVal;
 
-uint32_t tickWait(uint32_t numTicks, uint32_t currentTime)
+void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 {
 	uint16_t lastTime;
 	uint32_t targetTime;
 	
-	lastTime = currentTime;
+	lastTime = *pCurrentTime;
 	
-	targetTime = currentTime - numTicks;
+	targetTime = *pCurrentTime - numTicks;
 	
 	do
 	{
@@ -212,15 +212,13 @@ uint32_t tickWait(uint32_t numTicks, uint32_t currentTime)
 		// Handle wraparound
 		if (time > lastTime)
 		{
-			currentTime -= 0x10000l;
+			*pCurrentTime -= 0x10000l;
 		}
 		
-		currentTime &= 0xFFFF0000l;
-		currentTime |= time;
+		*pCurrentTime &= 0xFFFF0000l;
+		*pCurrentTime |= time;
 		lastTime = time;
-	} while (currentTime > targetTime);
-	
-	return currentTime;
+	} while (*pCurrentTime > targetTime);
 }
 
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
@@ -343,12 +341,12 @@ void PlayBuffer()
 		// max reasonable tickWait time is 50ms, so handle larger values in slices
 		while (delay > (SampleRate / 20))
 		{
-			currentTime = tickWait(PITFREQ / 20, currentTime);
+			tickWait(PITFREQ / 20, &currentTime);
 			delay -= (SampleRate / 20);
 		};
 		
 		if (delay > 0)				
-			currentTime = tickWait(PITFREQ / (SampleRate / delay), currentTime);
+			tickWait(PITFREQ / (SampleRate / delay), &currentTime);
 
 		// handle input
 		if (keypressed(NULL))
@@ -518,7 +516,7 @@ void PlayBufferTicks()
 	{
 		PlayTick();
 		
-		currentTime = tickWait(PITFREQ / 60, currentTime);
+		tickWait(PITFREQ / 60, &currentTime);
 
 		// handle input
 		if (keypressed(NULL))
