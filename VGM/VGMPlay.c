@@ -228,6 +228,7 @@ int playing = 1;
 uint8_t far* pPos = NULL;
 uint8_t far* pDelay = NULL;
 uint32_t currentTime;
+uint16_t delayTable[4096];
 
 void PlayTick(void);
 uint32_t GetDelay(void);
@@ -236,6 +237,17 @@ void PlayBuffer()
 {
 	uint8_t far* pNextPos;
 	uint32_t delay, nextDelay;
+	uint16_t i;
+	
+	// Prepare delay table
+	for (i = 0; i < _countof(delayTable); i++)
+	{
+		delay = i;
+		delay *= PITFREQ >> 5;
+		delay /= (SampleRate >> 5);
+		
+		delayTable[i] = delay;
+	}
 	
 	// Disable interrupts
 	_disable();
@@ -255,7 +267,6 @@ void PlayBuffer()
 	// Count down from maximum
 	currentTime |= 0xFFFF0000l;
 	
-
 	// Find the first delay command
 	pDelay = pPos;
 	delay = 0;
@@ -407,10 +418,16 @@ uint32_t GetDelay(void)
 					
 					// Hackish way to translate to PIT ticks, because of the size
 					// of the numbers involved.
-					delay = PITFREQ >> 5;
+					delay  = *pW++;
 					
-					delay *= *pW++;
-					delay /= (SampleRate >> 5);
+					// For small values, use a quick table lookup
+					if (delay < _countof(delayTable))
+						delay = delayTable[delay];
+					else
+					{
+						delay *= PITFREQ >> 5;
+						delay /= (SampleRate >> 5);
+					}
 					
 					pDelay = (uint8_t*)pW;
 					goto endDelay;
