@@ -165,24 +165,6 @@ void ClosePCSpeaker(void)
 }
 
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
-typedef union _WordVal
-{
-	struct {
-		uint8_t Byte0;
-		uint8_t Byte1;
-	};
-	uint16_t WordPart;
-} WordVal;
-
-typedef union _TimeVal
-{
-	struct {
-		WordVal LowPart;
-		WordVal HighPart;
-	};
-	uint16_t LongPart;	
-} TimeVal;
-
 void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 {
 	uint16_t lastTime;
@@ -214,67 +196,11 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 		
 		// Handle wraparound
 		if (time > lastTime)
-			*(pCurTimeW+1)--;
+			--(*(pCurTimeW+1));
 		
 		*pCurTimeW = time;
 		lastTime = time;
 	} while (*pCurrentTime > targetTime);
-}
-
-// Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
-void tickWait2(uint32_t numTicks)
-{
-	WordVal lastTime;
-	TimeVal currentTime, targetTime;
-	
-	// Disable interrupts
-	_disable();
-	
-	// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-	outp(CTCMODECMDREG, CHAN0 | AMREAD);
-	
-	// Get LSB of timer counter
-	currentTime.LowPart.Byte0 = inp(CHAN0PORT);
-	
-	// Get MSB of timer counter
-	currentTime.LowPart.Byte1 = inp(CHAN0PORT);
-	
-	// Re-enable interrupts
-	_enable();
-	
-	lastTime = currentTime.LowPart;
-	
-	// Count down from maximum
-	currentTime.HighPart.WordPart = 0xFFFF;
-	
-	targetTime.LongPart = currentTime.LongPart - numTicks;
-	
-	do
-	{
-		WordVal time;
-		
-		_disable();
-
-		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-		outp(CTCMODECMDREG, CHAN0 | AMREAD);
-		
-		// Get LSB of timer counter
-		time.Byte0 = inp(CHAN0PORT);
-		
-		// Get MSB of timer counter
-		time.Byte1 = inp(CHAN0PORT);
-		
-		_enable();
-		
-		// Handle wraparound
-		if (time.WordPart > lastTime.WordPart)
-		{
-			currentTime.HighPart.WordPart--;
-		}
-		
-		currentTime.LowPart = time;
-		lastTime = time;
-	} while (currentTime.LongPart > targetTime.LongPart);
 }
 
 int keypressed(uint8_t* pChar)
@@ -304,12 +230,12 @@ uint8_t far* pDelay = NULL;
 uint32_t currentTime;
 
 void PlayTick(void);
-uint16_t GetDelay(void);
+uint32_t GetDelay(void);
 
 void PlayBuffer()
 {
 	uint8_t far* pNextPos;
-	uint16_t delay, nextDelay;
+	uint32_t delay, nextDelay;
 	
 	// Disable interrupts
 	_disable();
@@ -340,14 +266,8 @@ void PlayBuffer()
 	{
 		// Perform waiting
 		// max reasonable tickWait time is 50ms, so handle larger values in slices
-		while (delay > (SampleRate / 20))
-		{
-			tickWait(PITFREQ / 20, &currentTime);
-			delay -= (SampleRate / 20);
-		};
-		
 		if (delay > 0)				
-			tickWait(PITFREQ / (SampleRate / delay), &currentTime);
+			tickWait(delay, &currentTime);
 
 		// Loop through all command-data
 		PlayTick();
@@ -437,9 +357,9 @@ endTick:;
 }
 
 // Delay in nr of samples (at samplerate of VGM file, usually 44100 Hz)
-uint16_t GetDelay(void)
+uint32_t GetDelay(void)
 {
-	uint16_t delay = 0;
+	uint32_t delay = 0;
 	
 	while (1)
 	{
@@ -484,81 +404,88 @@ uint16_t GetDelay(void)
 					uint16_t* pW;
 					
 					pW = (uint16_t*)pDelay;
-					delay = *pW++;
+					
+					// Hackish way to translate to PIT ticks, because of the size
+					// of the numbers involved.
+					delay = PITFREQ >> 5;
+					
+					delay *= *pW++;
+					delay /= (SampleRate >> 5);
+					
 					pDelay = (uint8_t*)pW;
 					goto endDelay;
 					break;
 				}
 			case 0x62:	// wait 1/60th second
-				delay = (SampleRate / 60);
+				delay = PITFREQ / 60;
 				goto endDelay;
 				break;
 			case 0x63:	// wait 1/50th second
-				delay = (SampleRate / 50);
+				delay = PITFREQ / 50;
 				goto endDelay;
 				break;
 			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 1;
+				delay = PITFREQ / (SampleRate / 1);
 				goto endDelay;
 				break;
 			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 2;
+				delay = PITFREQ / (SampleRate / 2);
 				goto endDelay;
 				break;
 			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 3;
+				delay = PITFREQ / (SampleRate / 3);
 				goto endDelay;
 				break;
 			case 0x73:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 4;
+				delay = PITFREQ / (SampleRate / 4);
 				goto endDelay;
 				break;
 			case 0x74:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 5;
+				delay = PITFREQ / (SampleRate / 5);
 				goto endDelay;
 				break;
 			case 0x75:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 6;
+				delay = PITFREQ / (SampleRate / 6);
 				goto endDelay;
 				break;
 			case 0x76:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 7;
+				delay = PITFREQ / (SampleRate / 7);
 				goto endDelay;
 				break;
 			case 0x77:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 8;
+				delay = PITFREQ / (SampleRate / 8);
 				goto endDelay;
 				break;
 			case 0x78:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 9;
+				delay = PITFREQ / (SampleRate / 9);
 				goto endDelay;
 				break;
 			case 0x79:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 10;
+				delay = PITFREQ / (SampleRate / 10);
 				goto endDelay;
 				break;
 			case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 11;
+				delay = PITFREQ / (SampleRate / 11);
 				goto endDelay;
 				break;
 			case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 12;
+				delay = PITFREQ / (SampleRate / 12);
 				goto endDelay;
 				break;
 			case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 13;
+				delay = PITFREQ / (SampleRate / 13);
 				goto endDelay;
 				break;
 			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 14;
+				delay = PITFREQ / (SampleRate / 14);
 				goto endDelay;
 				break;
 			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 15;
+				delay = PITFREQ / (SampleRate / 15);
 				goto endDelay;
 				break;
 			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
-				delay = 16;
+				delay = PITFREQ / (SampleRate / 16);
 				goto endDelay;
 				break;
 
