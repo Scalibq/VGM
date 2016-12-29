@@ -233,21 +233,11 @@ uint16_t delayTable[4096];
 void PlayTick(void);
 uint32_t GetDelay(void);
 
+uint8_t far* pNextPos;
+uint32_t currDelay, nextDelay;
+
 void PlayBuffer()
 {
-	uint8_t far* pNextPos;
-	uint32_t delay, nextDelay;
-	uint16_t i;
-	
-	// Prepare delay table
-	for (i = 0; i < _countof(delayTable); i++)
-	{
-		delay = i;
-		delay *= PITFREQ >> 5;
-		delay /= (SampleRate >> 5);
-		
-		delayTable[i] = delay;
-	}
 	
 	// Disable interrupts
 	_disable();
@@ -269,16 +259,16 @@ void PlayBuffer()
 	
 	// Find the first delay command
 	pDelay = pPos;
-	delay = 0;
-	pNextPos = pDelay;
+	currDelay = 0;
 	nextDelay = GetDelay();
+	pNextPos = pDelay;
 
 	while (playing)
 	{
 		// Perform waiting
 		// max reasonable tickWait time is 50ms, so handle larger values in slices
-		if (delay > 0)				
-			tickWait(delay, &currentTime);
+		if (currDelay > 0)				
+			tickWait(currDelay, &currentTime);
 
 		// Loop through all command-data
 		PlayTick();
@@ -286,7 +276,7 @@ void PlayBuffer()
 		// Prefetch next delay
 		pPos = pNextPos;
 		pNextPos = pDelay;
-		delay = nextDelay;
+		currDelay = nextDelay;
 		nextDelay = GetDelay();
 
 		// handle input
@@ -418,7 +408,7 @@ uint32_t GetDelay(void)
 					
 					// Hackish way to translate to PIT ticks, because of the size
 					// of the numbers involved.
-					delay  = *pW++;
+					delay = *pW++;
 					
 					// For small values, use a quick table lookup
 					if (delay < _countof(delayTable))
@@ -661,10 +651,26 @@ void DeinitSample(void)
 
 void interrupt Handler(void)
 {
+	if (currDelay < 65535)
+		SetTimerCount((uint16_t)currDelay);
+	else
+	{
+		// Not done yet, longer wait
+		currDelay -= 65536L;
+		SetTimerCount(0);
+		
+		return;
+	}
+	
 	PlayTick();
+	
+	pPos = pNextPos;
+	pNextPos = pDelay;
+	currDelay = nextDelay;
+	nextDelay = GetDelay();
 
 	// Acknowledge timer
-	outp(0x20, 0x20);
+	//outp(0x20, 0x20);
 
 	return;
 	
@@ -700,25 +706,17 @@ void interrupt (*Old1C)(void);
 
 void SetTimerRate(uint16_t rate)
 {
-	_disable();
-	
 	// Reset mode to trigger timer immediately
 	outp(0x43, 0x34);
 	
 	outp(0x40, rate);
 	outp(0x40, rate >> 8);
-	
-	_enable();
 }
 
 void SetTimerCount(uint16_t rate)
 {
-	_disable();
-	
 	outp(0x40, rate);
 	outp(0x40, rate >> 8);
-	
-	_enable();
 }
 
 void InitHandler(void)
@@ -757,6 +755,7 @@ int main(int argc, char* argv[])
 	uint8_t* pVGM;
 	VGMHeader* pHeader;
 	uint32_t idx;
+	uint16_t i;
 	
 	if (argc < 2)
 	{
@@ -835,12 +834,6 @@ int main(int argc, char* argv[])
     writeln;
   end;*/
 
-	// Setup auto-EOI
-	//machineType = GetMachineType();
-	
-	//SetAutoEOI(machineType);
-  
-
 	// Start playing.  Use polling method as we are not trying to be fancy
 	// at this stage, just trying to get something working}
 
@@ -865,8 +858,19 @@ int main(int argc, char* argv[])
 	
 	//InitSampleSN76489();
 	//InitSamplePIT();
+	
+	// Prepare delay table
+	for (i = 0; i < _countof(delayTable); i++)
+	{
+		uint32_t delay = i;
+		delay *= PITFREQ >> 5;
+		delay /= (SampleRate >> 5);
+		
+		delayTable[i] = delay;
+	}
 
 	// Polling timer-based replay
+	/*
 	SetTimerRate(0);
 	PlayBuffer();
 	_disable();
@@ -878,9 +882,20 @@ int main(int argc, char* argv[])
 	outp(0x40, 0);
 	
 	_enable();
+	*/
 	
 	// Int-based replay
-	/*
+	// Find the first delay command
+	pDelay = pPos;
+	currDelay = 0;
+	nextDelay = GetDelay();
+	pNextPos = pDelay;
+	
+	// Setup auto-EOI
+	machineType = GetMachineType();
+	
+	SetAutoEOI(machineType);
+
 	InitHandler();
 	
 	while (playing)
@@ -914,9 +929,8 @@ int main(int argc, char* argv[])
 	}
 	
 	DeinitHandler();
-	*/
 	
-	//RestorePICState(machineType);
+	RestorePICState(machineType);
 	
 	//DeinitSample();
  
