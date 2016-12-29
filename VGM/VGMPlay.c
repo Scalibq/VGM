@@ -300,6 +300,7 @@ int keypressed(uint8_t* pChar)
 
 int playing = 1;
 uint8_t far* pPos = NULL;
+uint8_t far* pDelay = NULL;
 uint32_t currentTime;
 
 void PlayTick(void);
@@ -307,6 +308,9 @@ uint16_t GetDelay(void);
 
 void PlayBuffer()
 {
+	uint8_t far* pNextPos;
+	uint16_t delay, nextDelay;
+	
 	// Disable interrupts
 	_disable();
 	
@@ -324,20 +328,20 @@ void PlayBuffer()
 	
 	// Count down from maximum
 	currentTime |= 0xFFFF0000l;
+	
+
+	// Find the first delay command
+	pDelay = pPos;
+	delay = GetDelay();
+	pNextPos = pDelay;
+	nextDelay = GetDelay();
 
 	while (playing)
 	{
-		uint16_t delay;
-		
 		// Loop through all command-data
 		PlayTick();
-		
-		// Step back to delay command
-		--pPos;
-		
+
 		// Now perform waiting
-		delay = GetDelay();
-		
 		// max reasonable tickWait time is 50ms, so handle larger values in slices
 		while (delay > (SampleRate / 20))
 		{
@@ -347,6 +351,11 @@ void PlayBuffer()
 		
 		if (delay > 0)				
 			tickWait(PITFREQ / (SampleRate / delay), &currentTime);
+		
+		pPos = pNextPos;
+		pNextPos = pDelay;
+		delay = nextDelay;
+		nextDelay = GetDelay();
 
 		// handle input
 		if (keypressed(NULL))
@@ -431,81 +440,133 @@ uint16_t GetDelay(void)
 {
 	uint16_t delay = 0;
 	
-	switch (*pPos++)
+	while (1)
 	{
-		case 0x61:	// wait n samples
-			{
-				uint16_t* pW;
-				
-				pW = (uint16_t*)pPos;
-				delay = *pW++;
-				pPos = (uint8_t*)pW;
+		switch (*pDelay++)
+		{
+			// SN76489 commands
+			case 0x4F:	// dd : Game Gear PSG stereo, write dd to port 0x06
+				// stereo PSG cmd, ignored
+				pDelay++;
 				break;
-			}
-		case 0x62:	// wait 1/60th second
-			delay = (SampleRate / 60);
-			break;
-		case 0x63:	// wait 1/50th second
-			delay = (SampleRate / 50);
-			break;
-		case 0x70:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 1;
-			break;
-		case 0x71:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 2;
-			break;
-		case 0x72:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 3;
-			break;
-		case 0x73:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 4;
-			break;
-		case 0x74:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 5;
-			break;
-		case 0x75:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 6;
-			break;
-		case 0x76:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 7;
-			break;
-		case 0x77:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 8;
-			break;
-		case 0x78:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 9;
-			break;
-		case 0x79:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 10;
-			break;
-		case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 11;
-			break;
-		case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 12;
-			break;
-		case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 13;
-			break;
-		case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 14;
-			break;
-		case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 15;
-			break;
-		case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
-			delay = 16;
-			break;
+			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
+				pDelay++;
+				break;
+			case 0x51:	// aa dd : YM2413, write value dd to register aa
+			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
+			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
+			case 0x54:	// aa dd : YM2151, write value dd to register aa
+			case 0x55:	// aa dd : YM2203, write value dd to register aa
+			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
+			case 0x57:	// aa dd : YM2608 port 1, write value dd to register aa
+			case 0x58:	// aa dd : YM2610 port 0, write value dd to register aa
+			case 0x59:	// aa dd : YM2610 port 1, write value dd to register aa
+			case 0x5A:	// aa dd : YM3812, write value dd to register aa
+			case 0x5B:	// aa dd : YM3526, write value dd to register aa
+			case 0x5C:	// aa dd : Y8950, write value dd to register aa
+			case 0x5D:	// aa dd : YMZ280B, write value dd to register aa
+			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
+			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
+				// Skip
+				pDelay += 2;
+				break;
 
-		case 0x66:
-			// end of VGM data
-			playing = 0;
-			break;
+			case 0x66:
+				// end of VGM data
+				playing = 0;
+				goto endDelay;
+				break;
+				
+			// Wait-commands
+			case 0x61:	// wait n samples
+				{
+					uint16_t* pW;
+					
+					pW = (uint16_t*)pDelay;
+					delay = *pW++;
+					pDelay = (uint8_t*)pW;
+					goto endDelay;
+					break;
+				}
+			case 0x62:	// wait 1/60th second
+				delay = (SampleRate / 60);
+				goto endDelay;
+				break;
+			case 0x63:	// wait 1/50th second
+				delay = (SampleRate / 50);
+				goto endDelay;
+				break;
+			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 1;
+				goto endDelay;
+				break;
+			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 2;
+				goto endDelay;
+				break;
+			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 3;
+				goto endDelay;
+				break;
+			case 0x73:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 4;
+				goto endDelay;
+				break;
+			case 0x74:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 5;
+				goto endDelay;
+				break;
+			case 0x75:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 6;
+				goto endDelay;
+				break;
+			case 0x76:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 7;
+				goto endDelay;
+				break;
+			case 0x77:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 8;
+				goto endDelay;
+				break;
+			case 0x78:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 9;
+				goto endDelay;
+				break;
+			case 0x79:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 10;
+				goto endDelay;
+				break;
+			case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 11;
+				goto endDelay;
+				break;
+			case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 12;
+				goto endDelay;
+				break;
+			case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 13;
+				goto endDelay;
+				break;
+			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 14;
+				goto endDelay;
+				break;
+			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 15;
+				goto endDelay;
+				break;
+			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
+				delay = 16;
+				goto endDelay;
+				break;
 
-		default:
-			printf("DoDelay(): Invalid: %02X\n", *(pPos-1));
-			break;
+			default:
+				printf("DoDelay(): Invalid: %02X\n", *(pDelay-1));
+				break;
+		}
 	}
+endDelay:;
 	
 	return delay;
 }
