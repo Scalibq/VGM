@@ -196,6 +196,8 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 	do
 	{
 		uint16_t time;
+		uint16_t* pCurTimeW = (uint16_t*)pCurrentTime;
+		uint8_t* pTime = (uint8_t*)&time;
 		
 		_disable();
 
@@ -203,20 +205,18 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 		outp(CTCMODECMDREG, CHAN0 | AMREAD);
 		
 		// Get LSB of timer counter
-		time = inp(CHAN0PORT);
+		*pTime = inp(CHAN0PORT);
 		
 		// Get MSB of timer counter
-		time |= ((uint16_t)inp(CHAN0PORT)) << 8;
+		*(pTime+1) = inp(CHAN0PORT);
 		
 		_enable();
 		
 		// Handle wraparound
 		if (time > lastTime)
-		{
-			*(((uint16_t*)pCurrentTime)+1) -= 1;
-		}
+			*(pCurTimeW+1)--;
 		
-		*((uint16_t*)pCurrentTime) = time;
+		*pCurTimeW = time;
 		lastTime = time;
 	} while (*pCurrentTime > targetTime);
 }
