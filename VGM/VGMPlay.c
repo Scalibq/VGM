@@ -188,7 +188,8 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 	uint16_t lastTime;
 	uint32_t targetTime;
 	
-	lastTime = *pCurrentTime;
+	// Get previous counter value (low 16 bits)
+	lastTime = (uint16_t)*pCurrentTime;
 	
 	targetTime = *pCurrentTime - numTicks;
 	
@@ -212,11 +213,10 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 		// Handle wraparound
 		if (time > lastTime)
 		{
-			*pCurrentTime -= 0x10000l;
+			*(((uint16_t*)pCurrentTime)+1) -= 1;
 		}
 		
-		*pCurrentTime &= 0xFFFF0000l;
-		*pCurrentTime |= time;
+		*((uint16_t*)pCurrentTime) = time;
 		lastTime = time;
 	} while (*pCurrentTime > targetTime);
 }
@@ -332,16 +332,13 @@ void PlayBuffer()
 
 	// Find the first delay command
 	pDelay = pPos;
-	delay = GetDelay();
+	delay = 0;
 	pNextPos = pDelay;
 	nextDelay = GetDelay();
 
 	while (playing)
 	{
-		// Loop through all command-data
-		PlayTick();
-
-		// Now perform waiting
+		// Perform waiting
 		// max reasonable tickWait time is 50ms, so handle larger values in slices
 		while (delay > (SampleRate / 20))
 		{
@@ -351,7 +348,11 @@ void PlayBuffer()
 		
 		if (delay > 0)				
 			tickWait(PITFREQ / (SampleRate / delay), &currentTime);
-		
+
+		// Loop through all command-data
+		PlayTick();
+
+		// Prefetch next delay
 		pPos = pNextPos;
 		pNextPos = pDelay;
 		delay = nextDelay;
