@@ -40,6 +40,8 @@ typedef struct
 
 uint16_t SNReg = 0xC0;
 
+void SetTimerCount(uint16_t rate);
+
 void InitPCjrAudio(void)
 {
 	uint8_t mplx;
@@ -402,9 +404,9 @@ uint32_t GetDelay(void)
 			// Wait-commands
 			case 0x61:	// wait n samples
 				{
-					uint16_t* pW;
+					uint16_t far* pW;
 					
-					pW = (uint16_t*)pDelay;
+					pW = (uint16_t far*)pDelay;
 					
 					// Hackish way to translate to PIT ticks, because of the size
 					// of the numbers involved.
@@ -419,7 +421,7 @@ uint32_t GetDelay(void)
 						delay /= (SampleRate >> 5);
 					}
 					
-					pDelay = (uint8_t*)pW;
+					pDelay = (uint8_t far*)pW;
 					goto endDelay;
 					break;
 				}
@@ -504,6 +506,150 @@ uint32_t GetDelay(void)
 endDelay:;
 	
 	return delay;
+}
+
+// Buffer format:
+// uint16_t delay;
+// uint8_t data_count;
+// uint8_t data[data_count]
+uint8_t far* pPreprocessed;
+uint8_t far* pBuf;
+
+uint8_t BufferTick(void)
+{
+	uint16_t count = 0;
+	
+	while (1)
+	{
+		switch (*pPos++)
+		{
+			// SN76489 commands
+			case 0x4F:	// dd : Game Gear PSG stereo, write dd to port 0x06
+				// stereo PSG cmd, ignored
+				pPos++;
+				break;
+			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
+				*pBuf++ = *pPos++;
+				count++;
+				break;
+			case 0x51:	// aa dd : YM2413, write value dd to register aa
+			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
+			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
+			case 0x54:	// aa dd : YM2151, write value dd to register aa
+			case 0x55:	// aa dd : YM2203, write value dd to register aa
+			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
+			case 0x57:	// aa dd : YM2608 port 1, write value dd to register aa
+			case 0x58:	// aa dd : YM2610 port 0, write value dd to register aa
+			case 0x59:	// aa dd : YM2610 port 1, write value dd to register aa
+			case 0x5A:	// aa dd : YM3812, write value dd to register aa
+			case 0x5B:	// aa dd : YM3526, write value dd to register aa
+			case 0x5C:	// aa dd : Y8950, write value dd to register aa
+			case 0x5D:	// aa dd : YMZ280B, write value dd to register aa
+			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
+			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
+				// Skip
+				pPos += 2;
+				break;
+
+			case 0x66:
+				// end of VGM data
+				playing = 0;
+				
+			// Wait-commands
+			case 0x61:	// wait n samples
+			case 0x62:	// wait 1/60th second
+			case 0x63:	// wait 1/50th second
+			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x73:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x74:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x75:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x76:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x77:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x78:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x79:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
+			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
+				goto endTick;
+				break;
+			default:
+				printf("BufferTick(): Invalid: %02X\n", *(pPos-1));
+				break;
+		}
+	}
+endTick:;
+
+	return count;
+}
+
+void PreProcessVGM()
+{
+	printf("Start preprocessing VGM\n");
+	
+	pDelay = pPos;
+	nextDelay = GetDelay();
+	pNextPos = pDelay;
+	
+#define BUFSIZE 16384
+	pPreprocessed = (uint8_t far*)_fmalloc(BUFSIZE);
+	
+	pBuf = pPreprocessed;
+	
+	while (playing)
+	{
+		// Encode new delay value
+		uint16_t far* pW;
+		uint8_t far* pCount;
+		uint32_t size;
+		
+		size = (uint32_t)pBuf-(uint32_t)pPreprocessed;
+		
+		printf("Size: %lu\n", size);
+		
+		if (size > BUFSIZE)
+		{
+			printf("Cutting off!\n");
+			break;
+		}
+		
+		// Break up into multiple delays with no notes
+		while (nextDelay >= 65536L)
+		{
+			pW = (uint16_t far*)pBuf;
+			*pW++ = 0;
+			pBuf = (uint8_t far*)pW;
+			*pBuf++ = 0;
+			
+			nextDelay -= 65536L;
+		}
+		
+		// Last delay
+		if (nextDelay == 0)
+			nextDelay = 1;
+		
+		pW = (uint16_t far*)pBuf;		
+		*pW++ = nextDelay;
+		pBuf = (uint8_t far*)pW;
+		
+		// Reserve some space for note count
+		pCount = pBuf++;
+		
+		*pCount = BufferTick();
+		pPos = pNextPos;
+		nextDelay = GetDelay();
+		pNextPos = pDelay;
+	}
+	
+	// Set playing position to start of buffer
+	pBuf = pPreprocessed;
+	playing = 1;
+	
+	printf("Done preprocessing VGM\n");
 }
 
 void PlayBufferTicks()
@@ -651,7 +797,22 @@ void DeinitSample(void)
 
 void interrupt Handler(void)
 {
-	if (nextDelay < 65535L)
+	uint8_t count;
+	
+	// Get delay value from stream
+	uint16_t far* pW = (uint16_t far*)pBuf;
+	SetTimerCount(*pW++);
+	
+	// Get note data
+	pBuf = (uint8_t far*)pW;
+	
+	count = *pBuf++;
+	
+	while (count--)
+		outp(SNReg, *pBuf++);
+	
+	
+	/*if (nextDelay < 65535L)
 	{
 		if (nextDelay > 10L)
 			SetTimerCount((uint16_t)nextDelay);
@@ -670,6 +831,7 @@ void interrupt Handler(void)
 	pPos = pNextPos;
 	pNextPos = pDelay;
 	nextDelay = GetDelay();
+	*/
 
 	// Acknowledge timer
 	//outp(0x20, 0x20);
@@ -890,10 +1052,13 @@ int main(int argc, char* argv[])
 	
 	// Int-based replay
 	// Find the first delay command
-	pDelay = pPos;
+	/*pDelay = pPos;
 	currDelay = GetDelay();
 	pNextPos = pDelay;
-	nextDelay = GetDelay();
+	nextDelay = GetDelay();*/
+	currDelay = 0;
+	
+	PreProcessVGM();
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
