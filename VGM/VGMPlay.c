@@ -609,7 +609,7 @@ void PreProcessVGM()
 		
 		size = (uint32_t)pBuf-(uint32_t)pPreprocessed;
 		
-		printf("Size: %lu\n", size);
+		//printf("Size: %lu\n", size);
 		
 		if (size > BUFSIZE)
 		{
