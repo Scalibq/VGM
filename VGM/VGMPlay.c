@@ -228,7 +228,7 @@ int playing = 1;
 uint8_t far* pPos = NULL;
 uint8_t far* pDelay = NULL;
 uint32_t currentTime;
-uint16_t delayTable[4096];
+uint32_t delayTable[4096];
 
 void PlayTick(void);
 uint32_t GetDelay(void);
@@ -278,7 +278,7 @@ void PlayBuffer()
 		pNextPos = pDelay;
 		currDelay = nextDelay;
 		nextDelay = GetDelay();
-
+		
 		// handle input
 		if (keypressed(NULL))
 			playing = 0;
@@ -415,8 +415,16 @@ uint32_t GetDelay(void)
 						delay = delayTable[delay];
 					else
 					{
-						delay *= PITFREQ >> 5;
-						delay /= (SampleRate >> 5);
+						uint32_t accu = 0;
+						
+						while (delay > (SampleRate / 20))
+						{
+							accu += PITFREQ / 20;
+							delay -= (SampleRate / 20);
+						}
+						
+						accu += PITFREQ / (SampleRate/delay);
+						delay = accu;
 					}
 					
 					pDelay = (uint8_t*)pW;
@@ -651,12 +659,15 @@ void DeinitSample(void)
 
 void interrupt Handler(void)
 {
-	if (currDelay < 65535)
-		SetTimerCount((uint16_t)currDelay);
+	if (nextDelay < 65535L)
+	{
+		if (nextDelay > 10L)
+			SetTimerCount((uint16_t)nextDelay);
+	}
 	else
 	{
 		// Not done yet, longer wait
-		currDelay -= 65536L;
+		nextDelay -= 65536L;
 		SetTimerCount(0);
 		
 		return;
@@ -666,7 +677,6 @@ void interrupt Handler(void)
 	
 	pPos = pNextPos;
 	pNextPos = pDelay;
-	currDelay = nextDelay;
 	nextDelay = GetDelay();
 
 	// Acknowledge timer
@@ -723,9 +733,9 @@ void InitHandler(void)
 {
 	//tickRate = PITfreq/8000;
 	//lastTickRate = tickRate;
-	tickRate = 19912;
+	//tickRate = 19912;
 	
-	SetTimerRate(tickRate);	// Play at 60 Hz
+	//SetTimerRate(tickRate);	// Play at 60 Hz
 
 	Old1C = _dos_getvect(0x8);
 	_dos_setvect(0x8, Handler);
@@ -860,17 +870,25 @@ int main(int argc, char* argv[])
 	//InitSamplePIT();
 	
 	// Prepare delay table
-	for (i = 0; i < _countof(delayTable); i++)
+	delayTable[0] = 1;
+	for (i = 1; i < _countof(delayTable); i++)
 	{
 		uint32_t delay = i;
-		delay *= PITFREQ >> 5;
-		delay /= (SampleRate >> 5);
+		uint32_t accu = 0;
+						
+		while (delay > (SampleRate / 20))
+		{
+			accu += PITFREQ / 20;
+			delay -= (SampleRate / 20);
+		}
+						
+		accu += PITFREQ / (SampleRate/delay);
 		
-		delayTable[i] = delay;
+		delayTable[i] = accu;
 	}
 
 	// Polling timer-based replay
-	/*
+/*	
 	SetTimerRate(0);
 	PlayBuffer();
 	_disable();
@@ -882,20 +900,21 @@ int main(int argc, char* argv[])
 	outp(0x40, 0);
 	
 	_enable();
-	*/
+*/
 	
 	// Int-based replay
 	// Find the first delay command
 	pDelay = pPos;
-	currDelay = 0;
-	nextDelay = GetDelay();
+	currDelay = GetDelay();
 	pNextPos = pDelay;
+	nextDelay = GetDelay();
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
 	
 	SetAutoEOI(machineType);
 
+	SetTimerCount(currDelay);
 	InitHandler();
 	
 	while (playing)
