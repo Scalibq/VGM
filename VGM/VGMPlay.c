@@ -415,16 +415,8 @@ uint32_t GetDelay(void)
 						delay = delayTable[delay];
 					else
 					{
-						uint32_t accu = 0;
-						
-						while (delay > (SampleRate / 20))
-						{
-							accu += PITFREQ / 20;
-							delay -= (SampleRate / 20);
-						}
-						
-						accu += PITFREQ / (SampleRate/delay);
-						delay = accu;
+						delay *= PITFREQ >> 5;
+						delay /= (SampleRate >> 5);
 					}
 					
 					pDelay = (uint8_t*)pW;
@@ -874,17 +866,11 @@ int main(int argc, char* argv[])
 	for (i = 1; i < _countof(delayTable); i++)
 	{
 		uint32_t delay = i;
-		uint32_t accu = 0;
-						
-		while (delay > (SampleRate / 20))
-		{
-			accu += PITFREQ / 20;
-			delay -= (SampleRate / 20);
-		}
-						
-		accu += PITFREQ / (SampleRate/delay);
 		
-		delayTable[i] = accu;
+		delay *= PITFREQ >> 5;
+		delay /= (SampleRate >> 5);
+		
+		delayTable[i] = delay;
 	}
 
 	// Polling timer-based replay
@@ -964,7 +950,7 @@ int main(int argc, char* argv[])
 		SetPCjrAudioVolume(3,15);
 	}
 
-	ClosePCjrAudio();
+	//ClosePCjrAudio();
 	//ClosePCSpeaker();
 
 	return 0;
