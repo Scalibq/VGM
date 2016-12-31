@@ -797,6 +797,52 @@ void DeinitSample(void)
 
 void interrupt Handler(void)
 {
+	__asm {
+		//push ds
+		//push si
+		//push ax
+		
+		// Get delay value from stream
+		mov ax, seg pBuf
+		lds si, [pBuf]
+		lodsb
+		out CHAN0PORT, al
+		lodsb
+		out CHAN0PORT, al
+		
+		// Get note count
+		lodsb
+		test al, al
+		jz endHandler
+		
+		// Play notes
+		//push cx
+		xor cx, cx
+		mov cl, al
+		
+	noteLoop:
+		lodsb
+		out 0xC0, al
+		
+		loop noteLoop
+		
+		//pop cx
+		
+	endHandler:
+		mov ax, seg pBuf
+		mov ds, ax
+		mov word ptr [pBuf], si
+		
+		//pop ax		
+		//pop si
+		//pop ds
+	}
+	
+	return;
+}
+
+void interrupt HandlerC(void)
+{
 	uint8_t count;
 	
 	// Get delay value from stream
