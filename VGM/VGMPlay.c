@@ -514,6 +514,7 @@ endDelay:;
 // uint8_t data[data_count]
 uint8_t far* pPreprocessed;
 uint8_t far* pBuf;
+uint8_t far* pEndBuf;
 
 uint8_t BufferTick(void)
 {
@@ -644,6 +645,9 @@ void PreProcessVGM()
 		nextDelay = GetDelay();
 		pNextPos = pDelay;
 	}
+	
+	// Save end of buffer
+	pEndBuf = pBuf;
 	
 	// Set playing position to start of buffer
 	pBuf = pPreprocessed;
@@ -1116,7 +1120,7 @@ int main(int argc, char* argv[])
 	
 	while (playing)
 	{
-		uint8_t key;
+		/*uint8_t key;
 		
 		if (keypressed(&key))
 		{
@@ -1141,12 +1145,16 @@ int main(int argc, char* argv[])
 			
 			SetTimerCount(tickRate);
 			printf("Tickrate: %d\n", tickRate);
-		}
+		}*/
+		if (pBuf > pEndBuf)
+			playing = 0;
 	}
 	
 	DeinitHandler();
 	
 	RestorePICState(machineType);
+	
+	_ffree(pPreprocessed);
 	
 	//DeinitSample();
  
