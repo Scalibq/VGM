@@ -872,6 +872,88 @@ void interrupt Handler(void)
 }
 */
 
+void PlayPolled(void)
+{
+	_disable();
+	
+	while (pBuf < pEndBuf)
+	{
+	
+	__asm {
+		//push ds
+		//push si
+		//push ax
+		
+		// Poll for interrupt
+		mov dx, PIC1
+		mov ah, 0x01
+		//mov ah, 0x80
+
+	pollLoop:
+		in al, dx
+		test al, ah
+		jne pollLoop
+		
+		// Poll to send INTA
+		/*mov al, 0x0C//OCW3_P
+		out dx, al
+		in al, dx*/
+
+		// Poll for interrupt
+		/*mov al, 0x0C//OCW3_P
+		out dx, al
+		in al, dx
+		test al, ah
+		jne pollLoop*/
+		
+		// Get delay value from stream
+		mov ax, seg pBuf
+		lds si, [pBuf]
+		lodsb
+		out CHAN0PORT, al
+		lodsb
+		out CHAN0PORT, al
+		
+		// Get note count
+		lodsb
+		test al, al
+		jz endHandler
+		
+		// Play notes
+		//push cx
+		xor cx, cx
+		mov cl, al
+		
+	noteLoop:
+		lodsb
+		out 0xC0, al
+		
+		loop noteLoop
+		
+		//pop cx
+		
+	endHandler:
+		mov ax, seg pBuf
+		mov ds, ax
+		mov word ptr [pBuf], si
+		
+		// Wait for counter to go low
+		mov ah, 0x01
+		
+	pollLoop2:
+		in al, dx
+		test al, ah
+		je pollLoop2
+		
+		//pop ax		
+		//pop si
+		//pop ds
+	}
+	}
+	
+	_enable();
+}
+
 void interrupt HandlerC(void)
 {
 	uint8_t count;
@@ -1088,7 +1170,8 @@ int main(int argc, char* argv[])
 	// mode 3; everything 486 and later inits mode 2.  Go figure.  This should
 	// not damage anything in DOS or TSRs, in case you were wondering.
 	//InitChannel(0,3,2,$0000);
-	outp(0x43, 0x34);
+	//outp(0x43, 0x34);
+	outp(0x43, 0x36);
 	
 	pPos = pVGM + idx;
 	
@@ -1144,6 +1227,8 @@ int main(int argc, char* argv[])
 	SetAutoEOI(machineType);
 
 	SetTimerCount(currDelay);
+	
+	/*
 	InitHandler();
 	
 	while (playing)
@@ -1174,13 +1259,16 @@ int main(int argc, char* argv[])
 			SetTimerCount(tickRate);
 			printf("Tickrate: %d\n", tickRate);
 		}*/
-		GetBuf();
+		/*GetBuf();
 		
 		if (pBuf > pEndBuf)
 			playing = 0;
 	}
 	
 	DeinitHandler();
+	*/
+	
+	PlayPolled();
 	
 	RestorePICState(machineType);
 	
