@@ -412,6 +412,8 @@ uint32_t GetDelay(void)
 					// of the numbers involved.
 					delay = *pW++;
 					
+					//printf("Delay: %u ticks\n", delay);
+					
 					// For small values, use a quick table lookup
 					if (delay < _countof(delayTable))
 						delay = delayTable[delay];
@@ -422,79 +424,98 @@ uint32_t GetDelay(void)
 					}
 					
 					pDelay = (uint8_t far*)pW;
+					
 					goto endDelay;
 					break;
 				}
 			case 0x62:	// wait 1/60th second
 				delay = PITFREQ / 60;
+				//printf("Delay: %u ticks\n", SampleRate/60);
 				goto endDelay;
 				break;
 			case 0x63:	// wait 1/50th second
 				delay = PITFREQ / 50;
+				//printf("Delay: %u ticks\n", SampleRate/50);
 				goto endDelay;
 				break;
 			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 1);
+				//printf("Delay: %u ticks\n", 1);
 				goto endDelay;
 				break;
 			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 2);
+				//printf("Delay: %u ticks\n", 2);
 				goto endDelay;
 				break;
 			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 3);
+				//printf("Delay: %u ticks\n", 3);
 				goto endDelay;
 				break;
 			case 0x73:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 4);
+				//printf("Delay: %u ticks\n", 4);
 				goto endDelay;
 				break;
 			case 0x74:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 5);
+				//printf("Delay: %u ticks\n", 5);
 				goto endDelay;
 				break;
 			case 0x75:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 6);
+				//printf("Delay: %u ticks\n", 6);
 				goto endDelay;
 				break;
 			case 0x76:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 7);
+				//printf("Delay: %u ticks\n", 7);
 				goto endDelay;
 				break;
 			case 0x77:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 8);
+				//printf("Delay: %u ticks\n", 8);
 				goto endDelay;
 				break;
 			case 0x78:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 9);
+				//printf("Delay: %u ticks\n", 9);
 				goto endDelay;
 				break;
 			case 0x79:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 10);
+				//printf("Delay: %u ticks\n", 10);
 				goto endDelay;
 				break;
 			case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 11);
+				//printf("Delay: %u ticks\n", 11);
 				goto endDelay;
 				break;
 			case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 12);
+				//printf("Delay: %u ticks\n", 12);
 				goto endDelay;
 				break;
 			case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 13);
+				//printf("Delay: %u ticks\n", 13);
 				goto endDelay;
 				break;
 			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 14);
+				//printf("Delay: %u ticks\n", 14);
 				goto endDelay;
 				break;
 			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 15);
+				//printf("Delay: %u ticks\n", 15);
 				goto endDelay;
 				break;
 			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
 				delay = PITFREQ / (SampleRate / 16);
+				//printf("Delay: %u ticks\n", 16);
 				goto endDelay;
 				break;
 
@@ -799,6 +820,11 @@ void DeinitSample(void)
 	}
 }
 
+extern void interrupt Handler(void);
+extern void __cdecl GetBuf(void);
+extern void __cdecl SetBuf(void);
+
+/*
 void interrupt Handler(void)
 {
 	__asm {
@@ -844,6 +870,7 @@ void interrupt Handler(void)
 	
 	return;
 }
+*/
 
 void interrupt HandlerC(void)
 {
@@ -1109,6 +1136,7 @@ int main(int argc, char* argv[])
 	currDelay = 0;
 	
 	PreProcessVGM();
+	SetBuf();
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
@@ -1146,6 +1174,8 @@ int main(int argc, char* argv[])
 			SetTimerCount(tickRate);
 			printf("Tickrate: %d\n", tickRate);
 		}*/
+		GetBuf();
+		
 		if (pBuf > pEndBuf)
 			playing = 0;
 	}
