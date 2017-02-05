@@ -874,15 +874,22 @@ void interrupt Handler(void)
 
 void PlayPolled(void)
 {
-	_disable();
+	//_disable();
 	
-	while (pBuf < pEndBuf)
-	{
+	//while (pBuf < pEndBuf)
+	//{
 	
 	__asm {
 		//push ds
 		//push si
 		//push ax
+		
+		cli
+		
+		les di, [pEndBuf]
+		lds si, [pBuf]
+		
+	mainLoop:
 		
 		// Poll for interrupt
 		mov dx, PIC1
@@ -892,7 +899,30 @@ void PlayPolled(void)
 	pollLoop:
 		in al, dx
 		test al, ah
+		je endPoll
+		in al, dx
+		test al, ah
+		je endPoll
+		in al, dx
+		test al, ah
+		je endPoll
+		in al, dx
+		test al, ah
+		je endPoll
+		in al, dx
+		test al, ah
+		je endPoll
+		in al, dx
+		test al, ah
+		je endPoll
+		in al, dx
+		test al, ah
+		je endPoll
+		in al, dx
+		test al, ah
 		jne pollLoop
+		
+	endPoll:
 		
 		// Poll to send INTA
 		/*mov al, 0x0C//OCW3_P
@@ -907,8 +937,7 @@ void PlayPolled(void)
 		jne pollLoop*/
 		
 		// Get delay value from stream
-		mov ax, seg pBuf
-		lds si, [pBuf]
+		//lds si, [pBuf]
 		lodsb
 		out CHAN0PORT, al
 		lodsb
@@ -933,9 +962,6 @@ void PlayPolled(void)
 		//pop cx
 		
 	endHandler:
-		mov ax, seg pBuf
-		mov ds, ax
-		mov word ptr [pBuf], si
 		
 		// Wait for counter to go low
 		mov ah, 0x01
@@ -945,13 +971,22 @@ void PlayPolled(void)
 		test al, ah
 		je pollLoop2
 		
+		cmp si, di
+		jb mainLoop
+		
+		mov ax, seg pBuf
+		mov ds, ax
+		mov word ptr [pBuf], si
+		
+		sti
+
 		//pop ax		
 		//pop si
 		//pop ds
 	}
-	}
+	//}
 	
-	_enable();
+	//_enable();
 }
 
 void interrupt HandlerC(void)
