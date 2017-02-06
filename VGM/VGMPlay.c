@@ -609,6 +609,35 @@ endTick:;
 	return count;
 }
 
+void PutDelay(uint32_t delay)
+{
+	uint16_t far* pW;
+
+	// Break up into multiple delays with no notes
+	while (delay >= 65536L)
+	{
+		pW = (uint16_t far*)pBuf;
+		*pW++ = 0;
+		pBuf = (uint8_t far*)pW;
+		*pBuf++ = 0;
+		
+		delay -= 65536L;
+	}
+	
+	// Last delay
+	if (delay > 0)
+	{
+		pW = (uint16_t far*)pBuf;		
+		*pW++ = delay;
+		pBuf = (uint8_t far*)pW;
+	}
+	else
+	{
+		// Don't put empty note data at the last delay
+		pBuf--;
+	}
+}
+
 void PreProcessVGM()
 {
 	printf("Start preprocessing VGM\n");
@@ -625,7 +654,6 @@ void PreProcessVGM()
 	while (playing)
 	{
 		// Encode new delay value
-		uint16_t far* pW;
 		uint8_t far* pCount;
 		uint32_t size;
 		
@@ -639,30 +667,14 @@ void PreProcessVGM()
 			break;
 		}
 		
-		// Break up into multiple delays with no notes
-		while (nextDelay >= 65536L)
-		{
-			pW = (uint16_t far*)pBuf;
-			*pW++ = 0;
-			pBuf = (uint8_t far*)pW;
-			*pBuf++ = 0;
-			
-			nextDelay -= 65536L;
-		}
-		
-		// Last delay
-		if (nextDelay == 0)
-			nextDelay = 1;
-		
-		pW = (uint16_t far*)pBuf;		
-		*pW++ = nextDelay;
-		pBuf = (uint8_t far*)pW;
+		PutDelay(nextDelay);
 		
 		// Reserve some space for note count
 		pCount = pBuf++;
 		
 		*pCount = BufferTick();
 		pPos = pNextPos;
+
 		nextDelay = GetDelay();
 		pNextPos = pDelay;
 	}
@@ -1106,6 +1118,110 @@ void DeinitHandler(void)
 
 MachineType machineType;
 
+void PlayPoll1(void)
+{
+
+	// Polling timer-based replay
+	SetTimerRate(0);
+	PlayBuffer();
+	_disable();
+	
+	// Return timer to default 18.2 Hz
+	outp(0x43, 0x36);
+	
+	outp(0x40, 0);
+	outp(0x40, 0);
+	
+	_enable();
+}
+
+void PlayPoll2(void)
+{
+	// Find the first delay command
+	/*pDelay = pPos;
+	currDelay = GetDelay();
+	pNextPos = pDelay;
+	nextDelay = GetDelay();*/
+	currDelay = 0;
+	
+	PreProcessVGM();
+	SetBuf();
+	
+	// Setup auto-EOI
+	machineType = GetMachineType();
+	
+	SetAutoEOI(machineType);
+
+	SetTimerCount(currDelay);
+	
+	PlayPolled();
+	
+	RestorePICState(machineType);
+}
+	
+void PlayInt(void)
+{
+	// Int-based replay
+	// Find the first delay command
+	/*pDelay = pPos;
+	currDelay = GetDelay();
+	pNextPos = pDelay;
+	nextDelay = GetDelay();*/
+	currDelay = 0;
+	
+	PreProcessVGM();
+	SetBuf();
+	
+	// Setup auto-EOI
+	machineType = GetMachineType();
+	
+	SetAutoEOI(machineType);
+
+	SetTimerCount(currDelay);
+	
+	InitHandler();
+	
+	while (playing)
+	{
+		/*uint8_t key;
+		
+		if (keypressed(&key))
+		{
+			switch(key)
+			{
+				case '1':
+					tickRate += 100;
+					break;
+				case '2':
+					tickRate -= 100;
+					break;
+				case '3':
+					playing = 0;
+					break;
+				case '4':
+					tickRate = 19912;
+					break;
+				case '5':
+					tickRate = 2000;
+					break;
+			}
+			
+			SetTimerCount(tickRate);
+			printf("Tickrate: %d\n", tickRate);
+		}*/
+		
+		__asm hlt
+		GetBuf();
+		
+		if (pBuf > pEndBuf)
+			playing = 0;
+	}
+	
+	DeinitHandler();
+	
+	RestorePICState(machineType);
+}
+
 int main(int argc, char* argv[])
 {
 	FILE* pFile;
@@ -1229,83 +1345,10 @@ int main(int argc, char* argv[])
 		
 		delayTable[i] = delay;
 	}
-
-	// Polling timer-based replay
-/*	
-	SetTimerRate(0);
-	PlayBuffer();
-	_disable();
 	
-	// Return timer to default 18.2 Hz
-	outp(0x43, 0x36);
-	
-	outp(0x40, 0);
-	outp(0x40, 0);
-	
-	_enable();
-*/
-	
-	// Int-based replay
-	// Find the first delay command
-	/*pDelay = pPos;
-	currDelay = GetDelay();
-	pNextPos = pDelay;
-	nextDelay = GetDelay();*/
-	currDelay = 0;
-	
-	PreProcessVGM();
-	SetBuf();
-	
-	// Setup auto-EOI
-	machineType = GetMachineType();
-	
-	SetAutoEOI(machineType);
-
-	SetTimerCount(currDelay);
-	
-	/*
-	InitHandler();
-	
-	while (playing)
-	{
-		/*uint8_t key;
-		
-		if (keypressed(&key))
-		{
-			switch(key)
-			{
-				case '1':
-					tickRate += 100;
-					break;
-				case '2':
-					tickRate -= 100;
-					break;
-				case '3':
-					playing = 0;
-					break;
-				case '4':
-					tickRate = 19912;
-					break;
-				case '5':
-					tickRate = 2000;
-					break;
-			}
-			
-			SetTimerCount(tickRate);
-			printf("Tickrate: %d\n", tickRate);
-		}*/
-		/*GetBuf();
-		
-		if (pBuf > pEndBuf)
-			playing = 0;
-	}
-	
-	DeinitHandler();
-	*/
-	
-	PlayPolled();
-	
-	RestorePICState(machineType);
+	//PlayPoll1();
+	//PlayPoll2();
+	PlayInt();
 	
 	_ffree(pPreprocessed);
 	
