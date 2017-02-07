@@ -616,25 +616,22 @@ void PutDelay(uint32_t delay)
 	// Break up into multiple delays with no notes
 	while (delay >= 65536L)
 	{
+		delay -= 65536L;
 		pW = (uint16_t far*)pBuf;
 		*pW++ = 0;
 		pBuf = (uint8_t far*)pW;
-		*pBuf++ = 0;
 		
-		delay -= 65536L;
+		// Don't put empty note data at the last delay
+		if (delay > 1)
+			*pBuf++ = 0;
 	}
 	
 	// Last delay
-	if (delay > 0)
+	if (delay > 1)
 	{
 		pW = (uint16_t far*)pBuf;		
 		*pW++ = delay;
 		pBuf = (uint8_t far*)pW;
-	}
-	else
-	{
-		// Don't put empty note data at the last delay
-		pBuf--;
 	}
 }
 
@@ -901,6 +898,13 @@ void PlayPolled(void)
 		les di, [pEndBuf]
 		lds si, [pBuf]
 		
+		// Get delay value from stream
+		//lds si, [pBuf]
+		lodsb
+		out CHAN0PORT, al
+		lodsb
+		out CHAN0PORT, al
+
 	mainLoop:
 		
 		// Poll for interrupt
@@ -948,13 +952,6 @@ void PlayPolled(void)
 		test al, ah
 		jne pollLoop*/
 		
-		// Get delay value from stream
-		//lds si, [pBuf]
-		lodsb
-		out CHAN0PORT, al
-		lodsb
-		out CHAN0PORT, al
-		
 		// Get note count
 		lodsb
 		test al, al
@@ -974,7 +971,6 @@ void PlayPolled(void)
 		//pop cx
 		
 	endHandler:
-		
 		// Wait for counter to go low
 		mov ah, 0x01
 		
@@ -983,6 +979,14 @@ void PlayPolled(void)
 		test al, ah
 		je pollLoop2
 		
+		// Get delay value from stream
+		//lds si, [pBuf]
+		lodsb
+		out CHAN0PORT, al
+		lodsb
+		out CHAN0PORT, al
+
+
 		cmp si, di
 		jb mainLoop
 		
@@ -1077,7 +1081,7 @@ void interrupt (*Old1C)(void);
 void SetTimerRate(uint16_t rate)
 {
 	// Reset mode to trigger timer immediately
-	outp(0x43, 0x34);
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	
 	outp(0x40, rate);
 	outp(0x40, rate >> 8);
@@ -1091,28 +1095,12 @@ void SetTimerCount(uint16_t rate)
 
 void InitHandler(void)
 {
-	//tickRate = PITfreq/8000;
-	//lastTickRate = tickRate;
-	//tickRate = 19912;
-	
-	//SetTimerRate(tickRate);	// Play at 60 Hz
-
 	Old1C = _dos_getvect(0x8);
 	_dos_setvect(0x8, Handler);
 }
 
 void DeinitHandler(void)
 {
-	_disable();
-	
-	// Return timer to default 18.2 Hz
-	outp(0x43, 0x36);
-	
-	outp(0x40, 0);
-	outp(0x40, 0);
-	
-	_enable();
-
 	_dos_setvect(0x8, Old1C);
 }
 
@@ -1120,19 +1108,16 @@ MachineType machineType;
 
 void PlayPoll1(void)
 {
-
+	// Set to rate generator
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	SetTimerCount(0);
+	
 	// Polling timer-based replay
-	SetTimerRate(0);
 	PlayBuffer();
-	_disable();
 	
-	// Return timer to default 18.2 Hz
-	outp(0x43, 0x36);
-	
-	outp(0x40, 0);
-	outp(0x40, 0);
-	
-	_enable();
+	// Reset to square wave
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	SetTimerCount(0);
 }
 
 void PlayPoll2(void)
@@ -1151,35 +1136,59 @@ void PlayPoll2(void)
 	machineType = GetMachineType();
 	
 	SetAutoEOI(machineType);
+	
+	// Set to sqarewave generator
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
 
 	SetTimerCount(currDelay);
 	
 	PlayPolled();
+	
+	// Reset to square wave
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	SetTimerCount(0);
 	
 	RestorePICState(machineType);
 }
 	
 void PlayInt(void)
 {
-	// Int-based replay
-	// Find the first delay command
-	/*pDelay = pPos;
-	currDelay = GetDelay();
-	pNextPos = pDelay;
-	nextDelay = GetDelay();*/
-	currDelay = 0;
+	uint8_t mask;
+	uint16_t far* pW;
 	
+	// Int-based replay
 	PreProcessVGM();
-	SetBuf();
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
 	
 	SetAutoEOI(machineType);
-
-	SetTimerCount(currDelay);
 	
+	_disable();
+	
+	// Set to rate generator
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	
+	// Mask timer interrupts
+	mask = inp(PIC1_DATA);
+	outp(PIC1_DATA, mask | 1);
+
+	// Have timer restart instantly
+	SetTimerCount(1);
+	
+	// Set first timer value
+	pW = (uint16_t far*)pBuf;
+	SetTimerCount(*pW++);
+	pBuf = (uint8_t far*)pW;
+	
+	SetBuf();
+
 	InitHandler();
+	
+	_enable();
+	
+	// Unmask timer interrupts
+	outp(PIC1_DATA, mask);
 	
 	while (playing)
 	{
@@ -1218,6 +1227,10 @@ void PlayInt(void)
 	}
 	
 	DeinitHandler();
+	
+	// Reset to square wave
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	SetTimerCount(0);
 	
 	RestorePICState(machineType);
 }
@@ -1321,8 +1334,6 @@ int main(int argc, char* argv[])
 	// mode 3; everything 486 and later inits mode 2.  Go figure.  This should
 	// not damage anything in DOS or TSRs, in case you were wondering.
 	//InitChannel(0,3,2,$0000);
-	//outp(0x43, 0x34);
-	outp(0x43, 0x36);
 	
 	pPos = pVGM + idx;
 	
