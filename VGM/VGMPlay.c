@@ -238,9 +238,8 @@ uint32_t GetDelay(void);
 uint8_t far* pNextPos;
 uint32_t currDelay, nextDelay;
 
-void PlayBuffer()
+void PlayBuffer1()
 {
-	
 	// Disable interrupts
 	_disable();
 	
@@ -629,6 +628,58 @@ void PutDelay(uint32_t delay)
 		pW = (uint16_t far*)pBuf;		
 		*pW++ = delay;
 		pBuf = (uint8_t far*)pW;
+	}
+}
+
+void PlayBuffer2()
+{
+	uint16_t far* pW;
+	uint8_t count;
+	
+	// Disable interrupts
+	_disable();
+	
+	// Get LSB of timer counter
+	currentTime = inp(CHAN0PORT);
+	
+	// Get MSB of timer counter
+	currentTime |= ((uint16_t)inp(CHAN0PORT)) << 8;
+	
+	// Re-enable interrupts
+	_enable();
+	
+	// Count down from maximum
+	currentTime |= 0xFFFF0000l;
+	
+	// Find the first delay command
+	currDelay = 0;
+	
+	pW = (uint16_t far*)pBuf;
+	nextDelay = *pW++;
+	pBuf = (uint8_t far*)pW;
+	
+	while (pBuf < pEndBuf)
+	{
+		// Perform waiting
+		// max reasonable tickWait time is 50ms, so handle larger values in slices
+		if (currDelay > 0)				
+			tickWait(currDelay, &currentTime);
+
+		// Loop through all command-data
+		count = *pBuf++;
+	
+		while (count--)
+			outp(SNReg, *pBuf++);
+
+		// Prefetch next delay
+		currDelay = nextDelay;
+		pW = (uint16_t far*)pBuf;
+		nextDelay = *pW++;
+		pBuf = (uint8_t far*)pW;
+		
+		// handle input
+		if (keypressed(NULL))
+			playing = 0;
 	}
 }
 
@@ -1171,12 +1222,14 @@ MachineType machineType;
 
 void PlayPoll1(void)
 {
+	PreProcessVGM();
+	
 	// Set to rate generator
 	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	SetTimerCount(0);
 	
 	// Polling timer-based replay
-	PlayBuffer();
+	PlayBuffer2();
 	
 	// Reset to square wave
 	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
