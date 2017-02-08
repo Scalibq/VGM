@@ -881,7 +881,7 @@ void interrupt Handler(void)
 }
 */
 
-void PlayPolled(void)
+void PlayPolled1(void)
 {
 	//_disable();
 	
@@ -899,7 +899,6 @@ void PlayPolled(void)
 		lds si, [pBuf]
 		
 		// Get delay value from stream
-		//lds si, [pBuf]
 		lodsb
 		out CHAN0PORT, al
 		lodsb
@@ -910,7 +909,6 @@ void PlayPolled(void)
 		// Poll for interrupt
 		mov dx, PIC1
 		mov ah, 0x01
-		//mov ah, 0x80
 
 	pollLoop:
 		in al, dx
@@ -945,20 +943,12 @@ void PlayPolled(void)
 		out dx, al
 		in al, dx*/
 
-		// Poll for interrupt
-		/*mov al, 0x0C//OCW3_P
-		out dx, al
-		in al, dx
-		test al, ah
-		jne pollLoop*/
-		
 		// Get note count
 		lodsb
 		test al, al
 		jz endHandler
 		
 		// Play notes
-		//push cx
 		xor cx, cx
 		mov cl, al
 		
@@ -967,8 +957,6 @@ void PlayPolled(void)
 		out 0xC0, al
 		
 		loop noteLoop
-		
-		//pop cx
 		
 	endHandler:
 		// Wait for counter to go low
@@ -1004,6 +992,84 @@ void PlayPolled(void)
 	
 	//_enable();
 }
+
+void PlayPolled2(void)
+{
+	//_disable();
+	
+	//while (pBuf < pEndBuf)
+	//{
+	
+	__asm {
+		//push ds
+		//push si
+		//push ax
+		
+		cli
+		
+		les di, [pEndBuf]
+		lds si, [pBuf]
+		
+		// Get delay value from stream
+		lodsb
+		out CHAN0PORT, al
+		lodsb
+		out CHAN0PORT, al
+
+	mainLoop:
+		
+		// Poll for interrupt
+		mov dx, PIC1_COMMAND
+		mov ah, 0x80
+		
+	pollLoop:
+		// Poll for interrupt
+		mov al, 0x0C//OCW3_P
+		out dx, al
+		in al, dx
+		test al, ah
+		jz pollLoop
+		
+		// Get note count
+		lodsb
+		test al, al
+		jz endHandler
+		
+		// Play notes
+		xor cx, cx
+		mov cl, al
+		
+	noteLoop:
+		lodsb
+		out 0xC0, al
+		
+		loop noteLoop
+		
+	endHandler:
+		// Get delay value from stream
+		lodsb
+		out CHAN0PORT, al
+		lodsb
+		out CHAN0PORT, al
+
+		cmp si, di
+		jb mainLoop
+		
+		mov ax, seg pBuf
+		mov ds, ax
+		mov word ptr [pBuf], si
+		
+		sti
+
+		//pop ax		
+		//pop si
+		//pop ds
+	}
+	//}
+	
+	//_enable();
+}
+
 
 void interrupt HandlerC(void)
 {
@@ -1122,13 +1188,6 @@ void PlayPoll1(void)
 
 void PlayPoll2(void)
 {
-	// Find the first delay command
-	/*pDelay = pPos;
-	currDelay = GetDelay();
-	pNextPos = pDelay;
-	nextDelay = GetDelay();*/
-	currDelay = 0;
-	
 	PreProcessVGM();
 	SetBuf();
 	
@@ -1142,7 +1201,32 @@ void PlayPoll2(void)
 
 	SetTimerCount(currDelay);
 	
-	PlayPolled();
+	PlayPolled1();
+	
+	// Reset to square wave
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	SetTimerCount(0);
+	
+	RestorePICState(machineType);
+}
+
+void PlayPoll3(void)
+{
+	PreProcessVGM();
+	SetBuf();
+	
+	// Setup auto-EOI
+	machineType = GetMachineType();
+	
+	SetAutoEOI(machineType);
+	
+	// Set to rate generator
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	SetTimerCount(0);
+
+	SetTimerCount(currDelay);
+	
+	PlayPolled2();
 	
 	// Reset to square wave
 	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
@@ -1359,7 +1443,8 @@ int main(int argc, char* argv[])
 	
 	//PlayPoll1();
 	//PlayPoll2();
-	PlayInt();
+	PlayPoll3();
+	//PlayInt();
 	
 	_ffree(pPreprocessed);
 	
