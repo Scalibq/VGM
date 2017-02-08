@@ -244,9 +244,6 @@ void PlayBuffer()
 	// Disable interrupts
 	_disable();
 	
-	// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-	outp(CTCMODECMDREG, CHAN0 | AMREAD);
-	
 	// Get LSB of timer counter
 	currentTime = inp(CHAN0PORT);
 	
@@ -1441,9 +1438,9 @@ int main(int argc, char* argv[])
 		delayTable[i] = delay;
 	}
 	
-	//PlayPoll1();
+	PlayPoll1();
 	//PlayPoll2();
-	PlayPoll3();
+	//PlayPoll3();
 	//PlayInt();
 	
 	_ffree(pPreprocessed);
