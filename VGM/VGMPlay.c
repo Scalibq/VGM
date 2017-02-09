@@ -662,8 +662,10 @@ void PlayBuffer2()
 	{
 		// Perform waiting
 		// max reasonable tickWait time is 50ms, so handle larger values in slices
-		if (currDelay > 0)				
-			tickWait(currDelay, &currentTime);
+		if (currDelay == 0)
+			currDelay = 65536L;
+
+		tickWait(currDelay, &currentTime);
 
 		// Loop through all command-data
 		count = *pBuf++;
