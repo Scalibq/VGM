@@ -1124,19 +1124,18 @@ void PlayPolled2(void)
 void interrupt HandlerC(void)
 {
 	uint8_t count;
-	
-	// Get delay value from stream
-	uint16_t far* pW = (uint16_t far*)pBuf;
-	SetTimerCount(*pW++);
+	uint16_t far* pW;
 	
 	// Get note data
-	pBuf = (uint8_t far*)pW;
-	
 	count = *pBuf++;
 	
 	while (count--)
 		outp(SNReg, *pBuf++);
-	
+
+	// Get delay value from stream
+	pW = (uint16_t far*)pBuf;
+	SetTimerCount(*pW++);
+	pBuf = (uint8_t far*)pW;
 	
 	/*if (nextDelay < 65535L)
 	{
@@ -1212,7 +1211,7 @@ void SetTimerCount(uint16_t rate)
 void InitHandler(void)
 {
 	Old1C = _dos_getvect(0x8);
-	_dos_setvect(0x8, Handler);
+	_dos_setvect(0x8, HandlerC);
 }
 
 void DeinitHandler(void)
@@ -1493,10 +1492,10 @@ int main(int argc, char* argv[])
 		delayTable[i] = delay;
 	}
 	
-	PlayPoll1();
+	//PlayPoll1();
 	//PlayPoll2();
 	//PlayPoll3();
-	//PlayInt();
+	PlayInt();
 	
 	_ffree(pPreprocessed);
 	
