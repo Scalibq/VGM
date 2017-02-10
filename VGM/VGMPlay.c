@@ -169,6 +169,43 @@ void ClosePCSpeaker(void)
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
 void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 {
+	uint32_t targetTime;
+	
+	targetTime = *pCurrentTime - numTicks;
+	
+	do
+	{
+		__asm
+		{
+			mov di, [pCurrentTime]
+			
+			cli
+			
+			// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
+			mov al, (CHAN0 or AMREAD)
+			out CTCMODECMDREG, al
+			// Get LSB of timer counter
+			in al, CHAN0PORT
+			mov cl, al
+			// Get MSB of timer counter
+			in al, CHAN0PORT
+			mov ch, al
+			
+			sti
+			
+			// Handle wraparound to 32-bit counter
+			cmp [di], cx
+			sbb word ptr [di+2], 0
+			
+			mov [di], cx
+		}
+
+	} while (*pCurrentTime > targetTime);
+}
+
+// Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
+void tickWaitC(uint32_t numTicks, uint32_t* pCurrentTime)
+{
 	uint16_t lastTime;
 	uint32_t targetTime;
 	
@@ -989,7 +1026,7 @@ void PlayPolled1(void)
 	endPoll:
 		
 		// Poll to send INTA
-		/*mov al, 0x0C//OCW3_P
+		/*mov al, (OCW3 or 0x04)//OCW3_P
 		out dx, al
 		in al, dx*/
 
@@ -1074,7 +1111,7 @@ void PlayPolled2(void)
 		
 	pollLoop:
 		// Poll for interrupt
-		mov al, 0x0C//OCW3_P
+		mov al, (OCW3 or 0x04)//OCW3_P
 		out dx, al
 		in al, dx
 		test al, ah
