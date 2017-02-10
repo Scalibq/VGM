@@ -170,37 +170,45 @@ void ClosePCSpeaker(void)
 void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 {
 	uint32_t targetTime;
-	
+
 	targetTime = *pCurrentTime - numTicks;
 	
-	do
+	__asm
 	{
-		__asm
-		{
-			mov di, [pCurrentTime]
+		mov di, [pCurrentTime]
+		mov dx, [di]
+		mov bx, [di+2]
 			
-			cli
+		cli
+		
+	pollLoop:
+		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
+		mov al, (CHAN0 or AMREAD)
+		out CTCMODECMDREG, al
+		// Get LSB of timer counter
+		in al, CHAN0PORT
+		mov cl, al
+		// Get MSB of timer counter
+		in al, CHAN0PORT
+		mov ch, al
 			
-			// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-			mov al, (CHAN0 or AMREAD)
-			out CTCMODECMDREG, al
-			// Get LSB of timer counter
-			in al, CHAN0PORT
-			mov cl, al
-			// Get MSB of timer counter
-			in al, CHAN0PORT
-			mov ch, al
+		// Handle wraparound to 32-bit counter
+		cmp dx, cx
+		sbb bx, 0
 			
-			sti
-			
-			// Handle wraparound to 32-bit counter
-			cmp [di], cx
-			sbb word ptr [di+2], 0
-			
-			mov [di], cx
-		}
+		mov dx, cx
 
-	} while (*pCurrentTime > targetTime);
+		// while (*pCurrentTime > targetTime)
+		cmp bx, word ptr [targetTime+2]
+		ja pollLoop
+		cmp dx, word ptr [targetTime]
+		ja pollLoop
+		
+		sti
+		
+		mov [di], dx
+		mov [di+2], bx
+	}
 }
 
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
@@ -1529,10 +1537,10 @@ int main(int argc, char* argv[])
 		delayTable[i] = delay;
 	}
 	
-	//PlayPoll1();
+	PlayPoll1();
 	//PlayPoll2();
 	//PlayPoll3();
-	PlayInt();
+	//PlayInt();
 	
 	_ffree(pPreprocessed);
 	
