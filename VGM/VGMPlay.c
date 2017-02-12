@@ -179,8 +179,6 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 		mov dx, [di]
 		mov bx, [di+2]
 			
-		cli
-		
 	pollLoop:
 		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
 		mov al, (CHAN0 or AMREAD)
@@ -204,8 +202,6 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 		cmp dx, word ptr [targetTime]
 		ja pollLoop
 		
-		sti
-		
 		mov [di], dx
 		mov [di+2], bx
 	}
@@ -228,8 +224,6 @@ void tickWaitC(uint32_t numTicks, uint32_t* pCurrentTime)
 		uint16_t* pCurTimeW = (uint16_t*)pCurrentTime;
 		uint8_t* pTime = (uint8_t*)&time;
 		
-		_disable();
-
 		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
 		outp(CTCMODECMDREG, CHAN0 | AMREAD);
 		
@@ -238,8 +232,6 @@ void tickWaitC(uint32_t numTicks, uint32_t* pCurrentTime)
 		
 		// Get MSB of timer counter
 		*(pTime+1) = inp(CHAN0PORT);
-		
-		_enable();
 		
 		// Handle wraparound
 		if (time > lastTime)
@@ -294,9 +286,6 @@ void PlayBuffer1()
 	// Get MSB of timer counter
 	currentTime |= ((uint16_t)inp(CHAN0PORT)) << 8;
 	
-	// Re-enable interrupts
-	_enable();
-	
 	// Count down from maximum
 	currentTime |= 0xFFFF0000l;
 	
@@ -326,6 +315,9 @@ void PlayBuffer1()
 		if (keypressed(NULL))
 			playing = 0;
 	}
+
+	// Re-enable interrupts
+	_enable();
 }
 
 void PlayTick(void)
@@ -690,8 +682,95 @@ void PlayBuffer2()
 	// Get MSB of timer counter
 	currentTime |= ((uint16_t)inp(CHAN0PORT)) << 8;
 	
+	// Count down from maximum
+	currentTime |= 0xFFFF0000l;
+	
+	// Find the first delay command
+	currDelay = 0;
+	
+	pW = (uint16_t far*)pBuf;
+	nextDelay = *pW++;
+	pBuf = (uint8_t far*)pW;
+	
+	while (pBuf < pEndBuf)
+	{
+		uint32_t targetTime;
+
+		// Perform waiting
+		// max reasonable tickWait time is 50ms, so handle larger values in slices
+		if (currDelay == 0)
+			currDelay = 65536L;
+
+		//tickWait(currDelay, &currentTime);
+		targetTime = currentTime - currDelay;
+	
+		__asm
+		{
+			lea di, [currentTime]
+			mov dx, [di]
+			mov bx, [di+2]
+				
+		pollLoop:
+			// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
+			mov al, (CHAN0 or AMREAD)
+			out CTCMODECMDREG, al
+			// Get LSB of timer counter
+			in al, CHAN0PORT
+			mov cl, al
+			// Get MSB of timer counter
+			in al, CHAN0PORT
+			mov ch, al
+				
+			// Handle wraparound to 32-bit counter
+			cmp dx, cx
+			sbb bx, 0
+				
+			mov dx, cx
+
+			// while (*pCurrentTime > targetTime)
+			cmp bx, word ptr [targetTime+2]
+			ja pollLoop
+			cmp dx, word ptr [targetTime]
+			ja pollLoop
+			
+			mov [di], dx
+			mov [di+2], bx
+		}
+		
+		// Loop through all command-data
+		count = *pBuf++;
+	
+		while (count--)
+			outp(SNReg, *pBuf++);
+
+		// Prefetch next delay
+		currDelay = nextDelay;
+		pW = (uint16_t far*)pBuf;
+		nextDelay = *pW++;
+		pBuf = (uint8_t far*)pW;
+		
+		// handle input
+		if (keypressed(NULL))
+			playing = 0;
+	}
+	
 	// Re-enable interrupts
 	_enable();
+}
+
+void PlayBuffer2C()
+{
+	uint16_t far* pW;
+	uint8_t count;
+	
+	// Disable interrupts
+	_disable();
+	
+	// Get LSB of timer counter
+	currentTime = inp(CHAN0PORT);
+	
+	// Get MSB of timer counter
+	currentTime |= ((uint16_t)inp(CHAN0PORT)) << 8;
 	
 	// Count down from maximum
 	currentTime |= 0xFFFF0000l;
@@ -728,6 +807,9 @@ void PlayBuffer2()
 		if (keypressed(NULL))
 			playing = 0;
 	}
+	
+	// Re-enable interrupts
+	_enable();
 }
 
 void PreProcessVGM()
