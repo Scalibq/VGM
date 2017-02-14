@@ -52,6 +52,10 @@ size_t _farfread( void far*_buf, size_t size, size_t n, FILE *fp )
 	uint8_t* pLocalBuf = alloca(FILEBUFSIZE);
 	
 	totalSize = size*n;
+	
+	if (totalSize == 0)
+		return 0;
+	
 	retSize = 0;
 	
 	while (totalSize > 0)
@@ -60,19 +64,19 @@ size_t _farfread( void far*_buf, size_t size, size_t n, FILE *fp )
 		size_t chunkSize = min(totalSize, FILEBUFSIZE);
 		
 		// Read chunk
-		ret = fread( pLocalBuf, chunkSize, 1, fp );
+		ret = fread( pLocalBuf, 1, chunkSize, fp );
 
-		if (ret != 1)
-			break;
-
-		retSize += chunkSize;
+		retSize += ret;
 		
 		// Copy from local buffer to destination
-		_fmemcpy( pDest, pLocalBuf, chunkSize );
+		_fmemcpy( pDest, pLocalBuf, ret );
 		
-		pDest += chunkSize;
+		pDest += ret;
 		
-		totalSize -= chunkSize;
+		totalSize -= ret;
+
+		if (ret != chunkSize)
+			break;
 	}
 	
 	// Return elements read
@@ -86,6 +90,10 @@ size_t _farfwrite( const void far*buf, size_t size, size_t n, FILE *fp )
 	uint8_t* pLocalBuf = alloca(FILEBUFSIZE);
 	
 	totalSize = size*n;
+	
+	if (totalSize == 0)
+		return 0;
+	
 	retSize = 0;
 	
 	while (totalSize > 0)
@@ -97,15 +105,15 @@ size_t _farfwrite( const void far*buf, size_t size, size_t n, FILE *fp )
 		_fmemcpy( pLocalBuf, pSrc, chunkSize );
 		
 		// Write chunk
-		ret = fwrite( pLocalBuf, chunkSize, 1, fp );
+		ret = fwrite( pLocalBuf, 1, chunkSize, fp );
 		
-		if (ret != 1)
+		if (ret != chunkSize)
 			break;
 
-		retSize += chunkSize;
-		pSrc += chunkSize;
+		retSize += ret;
+		pSrc += ret;
 		
-		totalSize -= chunkSize;
+		totalSize -= ret;
 	}
 	
 	// Return elements written
@@ -636,9 +644,9 @@ endDelay:;
 // uint16_t delay;
 // uint8_t data_count;
 // uint8_t data[data_count]
-uint8_t far* pPreprocessed;
-uint8_t far* pBuf;
-uint8_t far* pEndBuf;
+uint8_t huge* pPreprocessed;
+uint8_t huge* pBuf;
+uint8_t huge* pEndBuf;
 
 uint8_t BufferTick(void)
 {
@@ -2116,6 +2124,8 @@ int main(int argc, char* argv[])
 	fseek(pFile, 0, SEEK_END);
 	size = ftell(pFile);
 	fseek(pFile, 0, SEEK_SET);
+	
+	size = min(BUFSIZE, size);
 	
 	pVGM = malloc(size);
 	fread(pVGM, size, 1, pFile);
