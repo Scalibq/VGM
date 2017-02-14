@@ -103,7 +103,7 @@ size_t _farfwrite( const void far*buf, size_t size, size_t n, FILE *fp )
 			break;
 
 		retSize += chunkSize;
-		pSrc += ret;
+		pSrc += chunkSize;
 		
 		totalSize -= chunkSize;
 	}
@@ -908,7 +908,7 @@ void PlayBuffer2C()
 	_enable();
 }
 
-void SavePreprocessed(void);
+void SavePreprocessed(const char* pFileName);
 
 void PreProcessVGM()
 {
@@ -960,12 +960,12 @@ void PreProcessVGM()
 	
 	printf("Done preprocessing VGM\n");
 	
-	SavePreprocessed();
+	SavePreprocessed("out.pre");
 }
 
-void SavePreprocessed(void)
+void SavePreprocessed(const char* pFileName)
 {
-	FILE* pFile = fopen("out.pre", "wb");
+	FILE* pFile = fopen(pFileName, "wb");
 	size_t size;
 	
 	size = ((uintptr_t)pEndBuf-(uintptr_t)pPreprocessed);
@@ -975,6 +975,30 @@ void SavePreprocessed(void)
 	// Save to file
 	_farfwrite(pPreprocessed, size, 1, pFile);
 	fclose(pFile);
+}
+
+void LoadPreprocessed(const char* pFileName)
+{
+	FILE* pFile = fopen(pFileName, "rb");
+	size_t size;
+
+	fseek(pFile, 0, SEEK_END);
+	size = ftell(pFile);
+	fseek(pFile, 0, SEEK_SET);
+	
+	pPreprocessed = _fmalloc(size);
+	
+	printf("Preprocessed size: %u\n", size);
+	
+	// Load from file
+	_farfread(pPreprocessed, size, 1, pFile);
+	fclose(pFile);
+
+	pEndBuf = pPreprocessed + size;
+	
+	// Set playing position to start of buffer
+	pBuf = pPreprocessed;
+	playing = 1;
 }
 
 void PlayBufferTicks()
@@ -1465,6 +1489,7 @@ MachineType machineType;
 void PlayPoll1(void)
 {
 	PreProcessVGM();
+	LoadPreprocessed("out.pre");
 	
 	// Set to rate generator
 	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
