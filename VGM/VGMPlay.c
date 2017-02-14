@@ -42,6 +42,72 @@ uint16_t SNReg = 0xC0;
 
 void SetTimerCount(uint16_t rate);
 
+#define FILEBUFSIZE 1024
+
+size_t _farfread( void far*_buf, size_t size, size_t n, FILE *fp )
+{
+	size_t totalSize, retSize;
+	uint8_t far* pDest = (uint8_t far*)_buf;
+	uint8_t* pLocalBuf = alloca(FILEBUFSIZE);
+	
+	totalSize = size*n;
+	retSize = 0;
+	
+	while (totalSize > 0)
+	{
+		size_t ret;
+		size_t chunkSize = min(totalSize, FILEBUFSIZE);
+		
+		// Read chunk
+		ret = fread( pLocalBuf, chunkSize, 1, fp );
+		retSize += ret;
+		
+		// Copy from local buffer to destination
+		_fmemcpy( pDest, pLocalBuf, ret );
+		
+		if (ret != chunkSize)
+			break;
+
+		pDest += ret;
+		
+		totalSize -= ret;
+	}
+	
+	// Return elements read
+	return retSize / size;
+}
+
+size_t _farfwrite( const void far*buf, size_t size, size_t n, FILE *fp )
+{
+	size_t totalSize, retSize;
+	const uint8_t far* pSrc = (const uint8_t far*)buf;
+	uint8_t* pLocalBuf = alloca(FILEBUFSIZE);
+	
+	totalSize = size*n;
+	retSize = 0;
+	
+	while (totalSize > 0)
+	{
+		size_t ret;
+		size_t chunkSize = min(totalSize, FILEBUFSIZE);
+		
+		// Copy from source to local buffer
+		_fmemcpy( pLocalBuf, pSrc, chunkSize );
+		
+		// Write chunk
+		ret = fwrite( pLocalBuf, chunkSize, 1, fp );
+		retSize += ret;
+		
+		pSrc += ret;
+		
+		if (ret != chunkSize)
+			break;
+	}
+	
+	// Return elements written
+	return retSize / size;
+}
+
 void InitPCjrAudio(void)
 {
 	uint8_t mplx;
