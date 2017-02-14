@@ -1168,13 +1168,14 @@ void PreProcessVGM2()
 
 void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 {
-	FILE* pFile;
+	FILE* pFile, *pOut;
 	uint16_t delay;
 	uint8_t commands[256];
 	uint8_t* pCommands;
 	uint8_t count;
 	VGMHeader header;
 	uint32_t idx;
+	size_t size;
 	
 	pFile = fopen(pVGMFile, "rb");	
 
@@ -1218,9 +1219,7 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 	
 	printf("Start preprocessing VGM\n");
 	
-	pDelay = pPos;
-	nextDelay = GetDelay();
-	pNextPos = pDelay;
+	pOut = fopen(pOutFile, "wb");
 	
 #define BUFSIZE 16384
 	pPreprocessed = (uint8_t far*)_fmalloc(BUFSIZE);
@@ -1389,30 +1388,30 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 		// First write delay value
 		PutDelay(delay);
 		
+		// Write to disk
+		size = pBuf - pPreprocessed;
+		_farfwrite(pPreprocessed, size, 1, pOut);
+		
+		pBuf = pPreprocessed;
+		
 		// Now output commands
 		count = pCommands - commands;
-		*pBuf++ = count;
+		fwrite(&count, sizeof(count), 1, pOut);
 		pCommands = commands;
 		
 		while (count--)
-			*pBuf++ = *pCommands++;
+			fwrite(pCommands++, sizeof(commands[0]), 1, pOut);
 
 		// Reset command buffer
 		pCommands = commands;
 	}
 	
 	fclose(pFile);
+	fclose(pOut);
 	
-	// Save end of buffer
-	pEndBuf = pBuf;
-	
-	// Set playing position to start of buffer
-	pBuf = pPreprocessed;
-	playing = 1;
+	_ffree(pPreprocessed);	
 	
 	printf("Done preprocessing VGM\n");
-	
-	SavePreprocessed(pOutFile);
 }
 
 
