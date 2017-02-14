@@ -1172,7 +1172,6 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 	uint16_t delay;
 	uint8_t commands[256];
 	uint8_t* pCommands;
-	uint8_t count;
 	VGMHeader header;
 	uint32_t idx;
 	size_t size;
@@ -1225,7 +1224,7 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 	pPreprocessed = (uint8_t far*)_fmalloc(BUFSIZE);
 	
 	pBuf = pPreprocessed;
-	pCommands = commands;
+	pCommands = commands + 1;
 	
 	while (playing)
 	{
@@ -1236,7 +1235,7 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 			// SN76489 commands
 			case 0x4F:	// dd : Game Gear PSG stereo, write dd to port 0x06
 				// stereo PSG cmd, ignored
-				fgetc(pFile);
+				fseek(pFile, 1, SEEK_CUR);
 				break;
 			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
 				*pCommands++ = fgetc(pFile);
@@ -1257,8 +1256,7 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
 			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
 				// Skip
-				fgetc(pFile);
-				fgetc(pFile);
+				fseek(pFile, 2, SEEK_CUR);
 				break;
 
 			case 0x66:
@@ -1395,15 +1393,11 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 		pBuf = pPreprocessed;
 		
 		// Now output commands
-		count = pCommands - commands;
-		fwrite(&count, sizeof(count), 1, pOut);
-		pCommands = commands;
-		
-		while (count--)
-			fwrite(pCommands++, sizeof(commands[0]), 1, pOut);
+		commands[0] = pCommands - commands - 1;
+		fwrite(commands, commands[0]+1, 1, pOut);
 
 		// Reset command buffer
-		pCommands = commands;
+		pCommands = commands + 1;
 	}
 	
 	fclose(pFile);
@@ -1413,7 +1407,6 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 	
 	printf("Done preprocessing VGM\n");
 }
-
 
 void SavePreprocessed(const char* pFileName)
 {
