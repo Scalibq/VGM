@@ -61,17 +61,18 @@ size_t _farfread( void far*_buf, size_t size, size_t n, FILE *fp )
 		
 		// Read chunk
 		ret = fread( pLocalBuf, chunkSize, 1, fp );
-		retSize += ret;
-		
-		// Copy from local buffer to destination
-		_fmemcpy( pDest, pLocalBuf, ret );
-		
-		if (ret != chunkSize)
+
+		if (ret != 1)
 			break;
 
-		pDest += ret;
+		retSize += chunkSize;
 		
-		totalSize -= ret;
+		// Copy from local buffer to destination
+		_fmemcpy( pDest, pLocalBuf, chunkSize );
+		
+		pDest += chunkSize;
+		
+		totalSize -= chunkSize;
 	}
 	
 	// Return elements read
@@ -97,12 +98,14 @@ size_t _farfwrite( const void far*buf, size_t size, size_t n, FILE *fp )
 		
 		// Write chunk
 		ret = fwrite( pLocalBuf, chunkSize, 1, fp );
-		retSize += ret;
 		
+		if (ret != 1)
+			break;
+
+		retSize += chunkSize;
 		pSrc += ret;
 		
-		if (ret != chunkSize)
-			break;
+		totalSize -= chunkSize;
 	}
 	
 	// Return elements written
@@ -802,6 +805,32 @@ void PlayBuffer2()
 			
 			mov [di], dx
 			mov [di+2], bx
+			
+			/*
+			push ds
+			mov ax, seg pBuf
+			mov ds, ax
+			lds si, [pBuf]
+		
+			// Get note count
+			lodsb
+			test al, al
+			jz endHandler
+		
+			// Play notes
+			xor cx, cx
+			mov cl, al
+		
+		noteLoop:
+			lodsb
+			out 0xC0, al
+			
+		endHandler:
+			mov ax, seg pBuf
+			mov ds, ax
+			mov word ptr [pBuf], si
+			pop ds
+			*/
 		}
 		
 		// Loop through all command-data
@@ -879,6 +908,8 @@ void PlayBuffer2C()
 	_enable();
 }
 
+void SavePreprocessed(void);
+
 void PreProcessVGM()
 {
 	printf("Start preprocessing VGM\n");
@@ -928,6 +959,22 @@ void PreProcessVGM()
 	playing = 1;
 	
 	printf("Done preprocessing VGM\n");
+	
+	SavePreprocessed();
+}
+
+void SavePreprocessed(void)
+{
+	FILE* pFile = fopen("out.pre", "wb");
+	size_t size;
+	
+	size = ((uintptr_t)pEndBuf-(uintptr_t)pPreprocessed);
+	
+	printf("Preprocessed size: %u\n", size);
+	
+	// Save to file
+	_farfwrite(pPreprocessed, size, 1, pFile);
+	fclose(pFile);
 }
 
 void PlayBufferTicks()
