@@ -48,7 +48,7 @@ void SetTimerCount(uint16_t rate);
 size_t _farfread( void far*_buf, size_t size, size_t n, FILE *fp )
 {
 	size_t totalSize, retSize;
-	uint8_t far* pDest = (uint8_t far*)_buf;
+	uint8_t huge* pDest = (uint8_t huge*)_buf;
 	uint8_t* pLocalBuf = alloca(FILEBUFSIZE);
 	
 	totalSize = size*n;
@@ -82,7 +82,7 @@ size_t _farfread( void far*_buf, size_t size, size_t n, FILE *fp )
 size_t _farfwrite( const void far*buf, size_t size, size_t n, FILE *fp )
 {
 	size_t totalSize, retSize;
-	const uint8_t far* pSrc = (const uint8_t far*)buf;
+	const uint8_t huge* pSrc = (const uint8_t huge*)buf;
 	uint8_t* pLocalBuf = alloca(FILEBUFSIZE);
 	
 	totalSize = size*n;
