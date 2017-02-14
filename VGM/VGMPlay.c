@@ -5,6 +5,7 @@
 #include <conio.h>
 #include <math.h>
 #include <malloc.h>
+#include <string.h>
 #include "8253.h"
 #include "8259A.h"
 
