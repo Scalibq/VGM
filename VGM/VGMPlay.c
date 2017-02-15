@@ -1384,7 +1384,7 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 				goto endDelay;
 				break;
 			default:
-				printf("PreProcessVGM2(): Invalid: %02X\n", value);
+				printf("PreProcessVGM3(): Invalid: %02X\n", value);
 				break;
 		}
 		
@@ -1419,11 +1419,11 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 void SavePreprocessed(const char* pFileName)
 {
 	FILE* pFile = fopen(pFileName, "wb");
-	size_t size;
+	uint32_t size;
 	
-	size = ((uintptr_t)pEndBuf-(uintptr_t)pPreprocessed);
+	size = ((uint32_t)pEndBuf-(uint32_t)pPreprocessed);
 	
-	printf("Preprocessed size: %u\n", size);
+	printf("Preprocessed size: %lu\n", size);
 	
 	// Save to file
 	_farfwrite(pPreprocessed, size, 1, pFile);
@@ -1433,7 +1433,7 @@ void SavePreprocessed(const char* pFileName)
 void LoadPreprocessed(const char* pFileName)
 {
 	FILE* pFile = fopen(pFileName, "rb");
-	size_t size;
+	uint32_t size;
 
 	fseek(pFile, 0, SEEK_END);
 	size = ftell(pFile);
@@ -1441,7 +1441,7 @@ void LoadPreprocessed(const char* pFileName)
 	
 	pPreprocessed = _fmalloc(size);
 	
-	printf("Preprocessed size: %u\n", size);
+	printf("Preprocessed size: %lu\n", size);
 	
 	// Load from file
 	_farfread(pPreprocessed, size, 1, pFile);
