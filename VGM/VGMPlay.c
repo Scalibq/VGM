@@ -43,6 +43,19 @@ uint16_t SNReg = 0xC0;
 
 void SetTimerCount(uint16_t rate);
 
+void far* farmalloc(unsigned long size)
+{
+	// Round to next paragraph
+	unsigned long paras = (size + 15) >> 4;
+	
+	return halloc( paras, 16 );
+}
+
+void farfree(void far* pBuf)
+{
+	hfree(pBuf);
+}
+
 #define FILEBUFSIZE 1024
 
 uint32_t _farfread( void far*_buf, uint32_t size, uint32_t n, FILE *fp )
@@ -927,7 +940,7 @@ void PreProcessVGM1()
 	pNextPos = pDelay;
 	
 #define BUFSIZE 16384
-	pPreprocessed = (uint8_t far*)_fmalloc(BUFSIZE);
+	pPreprocessed = (uint8_t far*)farmalloc(BUFSIZE);
 	
 	pBuf = pPreprocessed;
 	
@@ -981,7 +994,7 @@ void PreProcessVGM2()
 	printf("Start preprocessing VGM\n");
 	
 #define BUFSIZE 16384
-	pPreprocessed = (uint8_t far*)_fmalloc(BUFSIZE);
+	pPreprocessed = (uint8_t far*)farmalloc(BUFSIZE);
 	
 	pBuf = pPreprocessed;
 	pCommands = commands;
@@ -1438,7 +1451,7 @@ void LoadPreprocessed(const char* pFileName)
 	size = ftell(pFile);
 	fseek(pFile, 0, SEEK_SET);
 	
-	pPreprocessed = _fmalloc(size);
+	pPreprocessed = farmalloc(size);
 	
 	printf("Preprocessed size: %lu\n", size);
 	
@@ -1494,7 +1507,7 @@ int16_t buf[1024];
 void InitSampleSN76489(void)
 {
 	int i;
-	size_t len;
+	unsigned long len;
 	FILE* pFile;
 	float iLog;
 	
@@ -1503,7 +1516,7 @@ void InitSampleSN76489(void)
 	len = ftell(pFile)/2L;
 	fseek(pFile, 0, SEEK_SET);
 		
-	pSampleBuffer = (uint8_t far*)_fmalloc(len);
+	pSampleBuffer = (uint8_t far*)farmalloc(len);
 	pSample = pSampleBuffer;
 	pSampleEnd = pSampleBuffer+len;
 	
@@ -1545,7 +1558,7 @@ void InitSampleSN76489(void)
 void InitSamplePIT(void)
 {
 	int i;
-	size_t len;
+	unsigned long len;
 	FILE* pFile;
 	float iLog;
 	
@@ -1554,7 +1567,7 @@ void InitSamplePIT(void)
 	len = ftell(pFile)/2L;
 	fseek(pFile, 0, SEEK_SET);
 		
-	pSampleBuffer = (uint8_t far*)_fmalloc(len);
+	pSampleBuffer = (uint8_t far*)farmalloc(len);
 	pSample = pSampleBuffer;
 	pSampleEnd = pSampleBuffer+len;
 	
@@ -1589,7 +1602,7 @@ void DeinitSample(void)
 {
 	if (pSampleBuffer != NULL)
 	{
-		_ffree(pSampleBuffer);
+		farfree(pSampleBuffer);
 		pSampleBuffer = NULL;
 		pSample = NULL;
 		pSampleEnd = NULL;
@@ -2218,7 +2231,7 @@ int main(int argc, char* argv[])
 	//PlayPoll3(argv[1]);
 	PlayInt(argv[1]);
 	
-	_ffree(pPreprocessed);
+	farfree(pPreprocessed);
 	
 	//DeinitSample();
  
