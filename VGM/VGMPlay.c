@@ -45,9 +45,9 @@ void SetTimerCount(uint16_t rate);
 
 #define FILEBUFSIZE 1024
 
-size_t _farfread( void far*_buf, size_t size, size_t n, FILE *fp )
+uint32_t _farfread( void far*_buf, uint32_t size, uint32_t n, FILE *fp )
 {
-	size_t totalSize, retSize;
+	uint32_t totalSize, retSize;
 	uint8_t huge* pDest = (uint8_t huge*)_buf;
 	uint8_t* pLocalBuf = alloca(FILEBUFSIZE);
 	
@@ -83,9 +83,9 @@ size_t _farfread( void far*_buf, size_t size, size_t n, FILE *fp )
 	return retSize / size;
 }
 
-size_t _farfwrite( const void far*buf, size_t size, size_t n, FILE *fp )
+uint32_t _farfwrite( const void far*buf, uint32_t size, uint32_t n, FILE *fp )
 {
-	size_t totalSize, retSize;
+	uint32_t totalSize, retSize;
 	const uint8_t huge* pSrc = (const uint8_t huge*)buf;
 	uint8_t* pLocalBuf = alloca(FILEBUFSIZE);
 	
@@ -1183,6 +1183,7 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 	VGMHeader header;
 	uint32_t idx;
 	size_t size;
+	uint8_t* pLocal;
 	
 	pFile = fopen(pVGMFile, "rb");	
 
@@ -1228,8 +1229,8 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 	
 	pOut = fopen(pOutFile, "wb");
 	
-#define BUFSIZE 16384
-	pPreprocessed = (uint8_t far*)_fmalloc(BUFSIZE);
+	pLocal = alloca(1024);
+	pPreprocessed = pLocal;
 	
 	pBuf = pPreprocessed;
 	pCommands = commands + 1;
@@ -1396,7 +1397,7 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 		
 		// Write to disk
 		size = pBuf - pPreprocessed;
-		_farfwrite(pPreprocessed, size, 1, pOut);
+		fwrite(pLocal, size, 1, pOut);
 		
 		pBuf = pPreprocessed;
 		
@@ -1410,8 +1411,6 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 	
 	fclose(pFile);
 	fclose(pOut);
-	
-	_ffree(pPreprocessed);	
 	
 	printf("Done preprocessing VGM\n");
 }
