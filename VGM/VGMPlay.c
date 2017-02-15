@@ -1297,11 +1297,19 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 					
 					// For small values, use a quick table lookup
 					if (delay < _countof(delayTable))
+					{
 						delay = delayTable[delay];
+					}
 					else
 					{
-						delay *= PITFREQ >> 5;
-						delay /= (SampleRate >> 5);
+						double fDelay;
+						uint16_t oldDelay = delay;
+						fDelay = delay*PITFREQ;
+						fDelay /= SampleRate;
+						delay = (uint16_t)fDelay;
+						
+						if (delay < 27)
+							printf("Delay: %u!\n, original value: %u\n", delay, oldDelay);
 					}
 					
 					goto endDelay;
@@ -2218,9 +2226,15 @@ int main(int argc, char* argv[])
 	for (i = 1; i < _countof(delayTable); i++)
 	{
 		uint32_t delay = i;
-		
+
+		/*
 		delay *= PITFREQ >> 5;
 		delay /= (SampleRate >> 5);
+		*/
+		double fDelay;
+		fDelay = delay*PITFREQ;
+		fDelay /= SampleRate;
+		delay = (uint16_t)fDelay;
 		
 		delayTable[i] = delay;
 	}
