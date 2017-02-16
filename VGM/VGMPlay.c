@@ -543,8 +543,15 @@ uint32_t GetDelay(void)
 						delay = delayTable[delay];
 					else
 					{
+						/*
 						delay *= PITFREQ >> 5;
 						delay /= (SampleRate >> 5);
+						*/
+						
+						double fDelay;
+						fDelay = delay*PITFREQ;
+						fDelay /= SampleRate;
+						delay = (uint32_t)fDelay;
 					}
 					
 					pDelay = (uint8_t far*)pW;
@@ -986,7 +993,7 @@ void PreProcessVGM1()
 
 void PreProcessVGM2()
 {
-	uint16_t delay;
+	uint32_t delay;
 	uint8_t commands[256];
 	uint8_t* pCommands;
 	uint8_t count;
@@ -1053,8 +1060,14 @@ void PreProcessVGM2()
 						delay = delayTable[delay];
 					else
 					{
+						/*
 						delay *= PITFREQ >> 5;
 						delay /= (SampleRate >> 5);
+						*/
+						double fDelay;
+						fDelay = delay*PITFREQ;
+						fDelay /= SampleRate;
+						delay = (uint32_t)fDelay;
 					}
 					
 					pPos = (uint8_t far*)pW;
@@ -1297,19 +1310,17 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 					
 					// For small values, use a quick table lookup
 					if (delay < _countof(delayTable))
-					{
 						delay = delayTable[delay];
-					}
 					else
 					{
 						double fDelay;
 						uint16_t oldDelay = delay;
 						fDelay = delay*PITFREQ;
 						fDelay /= SampleRate;
-						delay = (uint16_t)fDelay;
+						delay = (uint32_t)fDelay;
 						
 						if (delay < 27)
-							printf("Delay: %u!\n, original value: %u\n", delay, oldDelay);
+							printf("Delay: %lu!\n, original value: %u\n", delay, oldDelay);
 					}
 					
 					goto endDelay;
