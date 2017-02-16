@@ -1,16 +1,17 @@
 !define BLANK ""
-I:\Programming\Oldskool\DOS\VGM\IntHandler.obj : I:\Programming\Oldskool\DOS&
-\VGM\IntHandler.asm .AUTODEPEND
- @I:
- cd I:\Programming\Oldskool\DOS\VGM
- *wasm IntHandler.asm -i="I:\WATCOM/h" -ml -d1 -w4 -e25 -zq
-
 I:\Programming\Oldskool\DOS\VGM\8259A.obj : I:\Programming\Oldskool\DOS\COMM&
 ON\C\8259A.C .AUTODEPEND
  @I:
  cd I:\Programming\Oldskool\DOS\VGM
  *wcc ..\COMMON\C\8259A.C -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -z&
 q -otexan -ob -ol -ol+ -oc -oi -d2 -bt=dos -fo=.obj -ms
+
+I:\Programming\Oldskool\DOS\VGM\COMMON.obj : I:\Programming\Oldskool\DOS\COM&
+MON\C\COMMON.C .AUTODEPEND
+ @I:
+ cd I:\Programming\Oldskool\DOS\VGM
+ *wcc ..\COMMON\C\COMMON.C -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -&
+zq -otexan -ob -ol -ol+ -oc -oi -d2 -bt=dos -fo=.obj -ms
 
 I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj : I:\Programming\Oldskool\DOS\VG&
 M\VGMPlay.c .AUTODEPEND
@@ -20,13 +21,13 @@ M\VGMPlay.c .AUTODEPEND
 -ob -ol -ol+ -oc -oi -d2 -bt=dos -fo=.obj -ms
 
 I:\Programming\Oldskool\DOS\VGM\VGMPlay.exe : I:\Programming\Oldskool\DOS\VG&
-M\IntHandler.obj I:\Programming\Oldskool\DOS\VGM\8259A.obj I:\Programming\Ol&
-dskool\DOS\VGM\VGMPlay.obj I:\Programming\Oldskool\DOS\COMMON\C\8253.h I:\Pr&
-ogramming\Oldskool\DOS\COMMON\C\8259A.H I:\Programming\Oldskool\DOS\COMMON\C&
-\COMMON.H I:\Programming\Oldskool\DOS\COMMON\C\TYPES.H .AUTODEPEND
+M\8259A.obj I:\Programming\Oldskool\DOS\VGM\COMMON.obj I:\Programming\Oldsko&
+ol\DOS\VGM\VGMPlay.obj I:\Programming\Oldskool\DOS\COMMON\C\8253.h I:\Progra&
+mming\Oldskool\DOS\COMMON\C\8259A.H I:\Programming\Oldskool\DOS\COMMON\C\COM&
+MON.H I:\Programming\Oldskool\DOS\COMMON\C\TYPES.H .AUTODEPEND
  @I:
  cd I:\Programming\Oldskool\DOS\VGM
- @%write VGMPlay.lk1 FIL IntHandler.obj,8259A.obj,VGMPlay.obj
+ @%write VGMPlay.lk1 FIL 8259A.obj,COMMON.obj,VGMPlay.obj
  @%append VGMPlay.lk1 
  *wlink name VGMPlay d all sys dos op m op maxe=25 op q op symf @VGMPlay.lk1
 
