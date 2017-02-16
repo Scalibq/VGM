@@ -1872,7 +1872,7 @@ void PlayPolled2(void)
 void interrupt HandlerC(void)
 {
 	uint8_t count;
-	uint16_t far* pW;
+	uint16_t huge* pW;
 	
 	// Get note data
 	count = *pBuf++;
@@ -1881,9 +1881,9 @@ void interrupt HandlerC(void)
 		outp(SNReg, *pBuf++);
 
 	// Get delay value from stream
-	pW = (uint16_t far*)pBuf;
+	pW = (uint16_t huge*)pBuf;
 	SetTimerCount(*pW++);
-	pBuf = (uint8_t far*)pW;
+	pBuf = (uint8_t huge*)pW;
 	
 	/*if (nextDelay < 65535L)
 	{
