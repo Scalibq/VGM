@@ -1203,7 +1203,8 @@ void PreProcessVGM2()
 void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 {
 	FILE* pFile, *pOut;
-	uint16_t delay;
+	uint32_t delay;
+	uint16_t srcDelay;
 	uint8_t commands[256];
 	uint8_t* pCommands;
 	VGMHeader header;
@@ -1304,23 +1305,22 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 				{
 					// Hackish way to translate to PIT ticks, because of the size
 					// of the numbers involved.
-					fread(&delay, sizeof(delay), 1, pFile);
+					fread(&srcDelay, sizeof(srcDelay), 1, pFile);
 					
 					//printf("Delay: %u ticks\n", delay);
 					
 					// For small values, use a quick table lookup
-					if (delay < _countof(delayTable))
-						delay = delayTable[delay];
+					if (srcDelay < _countof(delayTable))
+						delay = delayTable[srcDelay];
 					else
 					{
 						double fDelay;
-						uint16_t oldDelay = delay;
-						fDelay = delay*PITFREQ;
+						fDelay = srcDelay*PITFREQ;
 						fDelay /= SampleRate;
 						delay = (uint32_t)fDelay;
 						
 						if (delay < 27)
-							printf("Delay: %lu!\n, original value: %u\n", delay, oldDelay);
+							printf("Delay: %lu!\n, original value: %u\n", delay, srcDelay);
 					}
 					
 					goto endDelay;
@@ -2233,7 +2233,7 @@ int main(int argc, char* argv[])
 	//InitSamplePIT();
 	
 	// Prepare delay table
-	delayTable[0] = 1;
+	delayTable[0] = 2;
 	for (i = 1; i < _countof(delayTable); i++)
 	{
 		uint32_t delay = i;
@@ -2245,7 +2245,7 @@ int main(int argc, char* argv[])
 		double fDelay;
 		fDelay = delay*PITFREQ;
 		fDelay /= SampleRate;
-		delay = (uint16_t)fDelay;
+		delay = (uint32_t)fDelay;
 		
 		delayTable[i] = delay;
 	}
