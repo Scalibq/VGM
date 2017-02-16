@@ -549,7 +549,7 @@ uint32_t GetDelay(void)
 						*/
 						
 						double fDelay;
-						fDelay = delay*PITFREQ;
+						fDelay = delay*(double)PITFREQ;
 						fDelay /= SampleRate;
 						delay = (uint32_t)fDelay;
 					}
@@ -1065,7 +1065,7 @@ void PreProcessVGM2()
 						delay /= (SampleRate >> 5);
 						*/
 						double fDelay;
-						fDelay = delay*PITFREQ;
+						fDelay = delay*(double)PITFREQ;
 						fDelay /= SampleRate;
 						delay = (uint32_t)fDelay;
 					}
@@ -1315,7 +1315,7 @@ void PreProcessVGM3(const char* pVGMFile, const char* pOutFile)
 					else
 					{
 						double fDelay;
-						fDelay = srcDelay*PITFREQ;
+						fDelay = srcDelay*(double)PITFREQ;
 						fDelay /= SampleRate;
 						delay = (uint32_t)fDelay;
 						
@@ -2243,7 +2243,7 @@ int main(int argc, char* argv[])
 		delay /= (SampleRate >> 5);
 		*/
 		double fDelay;
-		fDelay = delay*PITFREQ;
+		fDelay = delay*(double)PITFREQ;
 		fDelay /= SampleRate;
 		delay = (uint32_t)fDelay;
 		
