@@ -683,24 +683,16 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 			// Wait-commands
 			case 0x61:	// wait n samples
 				{
-					// Hackish way to translate to PIT ticks, because of the size
-					// of the numbers involved.
 					fread(&srcDelay, sizeof(srcDelay), 1, pFile);
-					
-					//printf("Delay: %u ticks\n", delay);
 					
 					// For small values, use a quick table lookup
 					if (srcDelay < _countof(delayTable))
 						delay = delayTable[srcDelay];
 					else
 					{
-						double fDelay;
-						fDelay = srcDelay*(double)PITFREQ;
-						fDelay /= SampleRate;
-						delay = (uint32_t)fDelay;
-						
-						if (delay < 27)
-							printf("Delay: %lu!\n, original value: %u\n", delay, srcDelay);
+						delay = srcDelay;
+						delay *= (PITFREQ >> 5);
+						delay /= (SampleRate >> 5);
 					}
 					
 					goto endDelay;
@@ -994,58 +986,6 @@ void DeinitSample(void)
 	}
 }
 
-extern void interrupt Handler(void);
-extern void __cdecl GetBuf(void);
-extern void __cdecl SetBuf(void);
-
-/*
-void interrupt Handler(void)
-{
-	__asm {
-		//push ds
-		//push si
-		//push ax
-		
-		// Get delay value from stream
-		mov ax, seg pBuf
-		lds si, [pBuf]
-		lodsb
-		out CHAN0PORT, al
-		lodsb
-		out CHAN0PORT, al
-		
-		// Get note count
-		lodsb
-		test al, al
-		jz endHandler
-		
-		// Play notes
-		//push cx
-		xor cx, cx
-		mov cl, al
-		
-	noteLoop:
-		lodsb
-		out 0xC0, al
-		
-		loop noteLoop
-		
-		//pop cx
-		
-	endHandler:
-		mov ax, seg pBuf
-		mov ds, ax
-		mov word ptr [pBuf], si
-		
-		//pop ax		
-		//pop si
-		//pop ds
-	}
-	
-	return;
-}
-*/
-
 void PlayPolled1(void)
 {
 	//_disable();
@@ -1252,7 +1192,7 @@ void interrupt HandlerC(void)
 	pBuf = (uint8_t huge*)pW;
 }
 
-void interrupt (*Old1C)(void);
+void interrupt (*OldInt8)(void);
 
 void SetTimerRate(uint16_t rate)
 {
@@ -1271,13 +1211,13 @@ void SetTimerCount(uint16_t rate)
 
 void InitHandler(void)
 {
-	Old1C = _dos_getvect(0x8);
+	OldInt8 = _dos_getvect(0x8);
 	_dos_setvect(0x8, HandlerC);
 }
 
 void DeinitHandler(void)
 {
-	_dos_setvect(0x8, Old1C);
+	_dos_setvect(0x8, OldInt8);
 }
 
 MachineType machineType;
@@ -1303,7 +1243,6 @@ void PlayPoll2(const char* pVGMFile)
 {
 	PreProcessVGM(pVGMFile, "out.pre");
 	LoadPreprocessed("out.pre");
-	SetBuf();
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
@@ -1327,7 +1266,6 @@ void PlayPoll3(const char* pVGMFile)
 {
 	PreProcessVGM(pVGMFile, "out.pre");
 	LoadPreprocessed("out.pre");
-	SetBuf();
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
@@ -1378,8 +1316,6 @@ void PlayInt(const char* pVGMFile)
 	SetTimerCount(*pW++);
 	pBuf = (uint8_t far*)pW;
 	
-	SetBuf();
-
 	InitHandler();
 	
 	_enable();
@@ -1389,35 +1325,7 @@ void PlayInt(const char* pVGMFile)
 	
 	while (playing)
 	{
-		/*uint8_t key;
-		
-		if (keypressed(&key))
-		{
-			switch(key)
-			{
-				case '1':
-					tickRate += 100;
-					break;
-				case '2':
-					tickRate -= 100;
-					break;
-				case '3':
-					playing = 0;
-					break;
-				case '4':
-					tickRate = 19912;
-					break;
-				case '5':
-					tickRate = 2000;
-					break;
-			}
-			
-			SetTimerCount(tickRate);
-			printf("Tickrate: %d\n", tickRate);
-		}*/
-		
 		__asm hlt
-		GetBuf();
 		
 		if (pBuf > pEndBuf)
 			playing = 0;
@@ -1477,14 +1385,8 @@ int main(int argc, char* argv[])
 	{
 		uint32_t delay = i;
 
-		/*
-		delay *= PITFREQ >> 5;
+		delay *= (PITFREQ >> 5);
 		delay /= (SampleRate >> 5);
-		*/
-		double fDelay;
-		fDelay = delay*(double)PITFREQ;
-		fDelay /= SampleRate;
-		delay = (uint32_t)fDelay;
 		
 		delayTable[i] = delay;
 	}
