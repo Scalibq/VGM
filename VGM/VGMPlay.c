@@ -135,11 +135,18 @@ uint32_t _farfwrite( const void far*buf, uint32_t size, uint32_t n, FILE *fp )
 
 void InitPCjrAudio(void)
 {
+	/*
 	uint8_t mplx;
 	
 	mplx = inp(SNMplxr);
 	mplx |= 0x60;	// set bits 6 and 5 to route SN audio through multiplexor
 	outp(SNMplxr, mplx);
+	*/
+	// Audio Multiplexer is Int1A AH=80 AL=Audio source (0=PC speaker, 1=Cassette, 2=I/O channel "Audio In", 3=SN76496).
+	union REGS in, out;
+
+	in.h.al = 3;
+	int86(0x1A, &in, &out);
 }
 
 // Sets an SN voice with volume and a desired frequency
@@ -219,6 +226,7 @@ void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
 
 void ClosePCjrAudio(void)
 {
+	union REGS in, out;
 	uint8_t chan, mplx;
 
 	for (chan = 0; chan < 3; chan++)
@@ -228,9 +236,14 @@ void ClosePCjrAudio(void)
 	SetPCjrAudioVolume(3,15);
 
 	// Reset the multiplexor
+	/*
 	mplx = inp(SNMplxr);
 	mplx &= 0x9C;	// clear 6 and 5 to route PC speaker through multiplexor; 1 and 0 turn off timer signal
 	outp(SNMplxr, mplx);
+	*/
+	// Audio Multiplexer is Int1A AH=80 AL=Audio source (0=PC speaker, 1=Cassette, 2=I/O channel "Audio In", 3=SN76496).
+	in.h.al = 0;
+	int86(0x1A, &in, &out);
 }
 
 void InitPCSpeaker(void)
@@ -2211,7 +2224,7 @@ int main(int argc, char* argv[])
 	// Start playing.  Use polling method as we are not trying to be fancy
 	// at this stage, just trying to get something working}
 
-	//InitPCjrAudio();
+	InitPCjrAudio();
 	//SetPCjrAudio(1,440,15);
 	//InitPCSpeaker();
 
@@ -2270,7 +2283,7 @@ int main(int argc, char* argv[])
 		SetPCjrAudioVolume(3,15);
 	}
 
-	//ClosePCjrAudio();
+	ClosePCjrAudio();
 	//ClosePCSpeaker();
 
 	return 0;
