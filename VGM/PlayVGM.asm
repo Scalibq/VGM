@@ -1,174 +1,431 @@
 .8086
 .Model Small
-.stack 100h
 
-VFileIdent equ 0206d6756h
-SNReg equ 0C0h
-SNFreq equ 3579540
-SNMplxr equ 061h	; MC14529b sound multiplexor chip in the PCjr
-SampleRate equ 44100
-PITfreq equ 1193182
+include common.inc
+include 8253.inc
+include 8259A.inc
+
+BUFSIZE equ 32768
+NUMBUF equ 1
+
+LOCALS @@
+
+.stack 100h
 
 .code
 start:
-	push	cs
-	pop		ds
+	push es
 
-	; Open VGM file
-	mov		ax, 3D00h
-	mov		dx, offset fileName
-	int		21h
-	jc		openFailed
+	; Set DS to .data
+	mov ax, @data
+	mov ds, ax
+	
+	; Disable all interrupts except timer and keyboard
+	;in al, PIC1_DATA
+	;mov [picMask], al
+	;mov al, not 03h
+	;out PIC1_DATA, al
 
-continue:
-	; Store file handle
-	mov		[fileHandle], ax
-	
-	; Seek to get the file size
-	mov		bx, ax
-	mov		ax, 4202h
-	xor		cx, cx
-	xor		dx, dx
-	int		21h
-	mov		word ptr [fileSize], ax
-	mov		word ptr [fileSize+2], dx
-	
-	xor		dx, dx
-	mov		ax, 4200h
-	int		21h
-	
 	mov		ah, 4Ah
-	mov		bx, 1000h
+	mov		bx, 3000h
 	int		21h		; DOS -	2+ - ADJUST MEMORY BLOCK SIZE (SETBLOCK)
 					; ES = segment address of block	to change
 					; BX = new size	in paragraphs
-	
-	; Allocate memory
-	mov		bx, word ptr [fileSize]
-	add		bx, 15	; Round up
-	shr		bx, 1
-	shr		bx, 1
-	shr		bx, 1
-	shr		bx, 1
-	mov		ah, 48h
-	int		21h
-	mov		word ptr [pSong+2], ax	
-	
-	; Load data
-	push	ds	
-	mov		ah, 3Fh
-	mov		bx, [fileHandle]
-	mov		cx, word ptr [fileSize]
-	lds		dx, [pSong]
-	int		21h
-	
-	pop		ds
-	
-	; Close file handle
-	mov		ah, 3Eh
-	mov		bx, fileHandle]
-	int		21h
-	
-	; Play file
-	; Adjust file pointer
-	add		word ptr cs:[pSong], 40h
-	
-	; Init PIT at right frequency and mode
-	mov al, 34h
-	out 43h, al
-	
-playLoop:
-	call	DoTick
-	
-	call	DoWait
+	jnc @@noErr1
+	jmp err
+@@noErr1:
 
-	mov		al, cs:[playing]
-	test	al, al
-	jnz		playLoop
-	
-openFailed:
-	; Exit process
-	mov ax,	4C00h
-	int		21h
-	
-iMC_Chan0	equ 0
-iMC_LatchCounter	equ 0
-iMC_OpMode2	equ 100b
-iMC_BinaryMode	equ 0
-numticks equ (PITfreq/60)
-	
-DoWait PROC
-  ; Build PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-  mov    bh,iMC_Chan0
-  mov    al,bh
-  ; get initial count
-  cli
-  out    43h,al         ; Tell timer about it
-  in     al,40h         ; Get LSB of timer counter
-  xchg   al,ah          ; Save it in ah (xchg accum,reg is 3c 1b)
-  in     al,40h         ; Get MSB of timer counter
-  sti
-  xchg   al,ah          ; Put things in the right order; AX:=starting timer
-  mov    dx,ax          ; store for later
+	; Allocate preprocessed VGM buffer of 64K (1000h paragraphs)
+	mov ah, 48h
+	mov bx, 1000h
+	int 21h
+	jnc @@noErr2
+	jmp err
+@@noErr2:
 
-@wait:
-  ; get next count
-  mov    al,bh          ; Use same Mode/Command as before (latch counter, etc.)
-  cli                   ; Disable interrupts so our operation is atomic
-  out    43h,al         ; Tell timer about it
-  in     al,40h         ; Get LSB of timer counter
-  xchg   al,ah          ; Save it in ah for a second
-  in     al,40h         ; Get MSB of timer counter
-  sti
-  xchg   al,ah          ; AX:=new timer value
-  ; see if our count period has elapsed
-  mov    si,dx          ; copy original value to scratch
-  sub    si,ax          ; subtract new value from old value
-  cmp    si,numticks    ; compare si to maximum time allowed
-  jb     @wait          ; if still below, keep waiting; if above, blow doors
-  
-  ret
-DoWait ENDP
+	mov [sampleBufSeg], ax
+	mov es, ax
+	
+	; Open music stream file
+	mov al, 0	; read-only
+	mov ah, 03Dh
+	mov dx, offset fileName
+	int 21h
+	mov cs:[file], ax
+	
+	; Preprocess sample
+REPT NUMBUF
+	call MixBuffer
+ENDM
 
-DoTick PROC
-	push	ds
-	lds		si, cs:[pSong]
+	; Get PIC into auto-EOI mode
+	call GetMachineType
+	mov [machineType], cl
+	call InitAEOI
 	
-nextCommand:
-	lodsb
-	cmp		al, 050h
-	jne		noNote
-	lodsb
-	out		SNReg, al
-	jmp		nextCommand
+	; Copy handler to sample buffer
+	mov cx, (EndTimerHandler-TimerHandler+1)/2
+	mov si, offset TimerHandler
+	mov di, 32768
+	rep movsw
 	
-noNote:
-	cmp		al, 062h
-	je		doneTick
-	cmp		al, 063h
-	je		doneTick
-	
-	cmp		al, 066h
-	je		endSong
-	
-	jmp		nextCommand
-	
-endSong:
-	mov		byte ptr cs:[playing], 0
-	
-doneTick:
-	mov		word ptr cs:[pSong], si
-	
-	pop		ds
+	; Install our own handler	
+	cli
 
+	InitPIT CHAN0, %(MODE2 or AMBOTH or BINARY), 2
+	
+	; TODO: get the interrupt started with the first delay
+
+	push    ds
+	xor     bx, bx
+	mov     ds, bx
+	mov     bx, ds:[20h]
+	mov     word ptr cs:[oldint8], bx
+	mov     bx, ds:[22h]
+	mov     word ptr cs:[oldint8+2], bx
+	
+	mov     word ptr ds:[20h], 32768
+	mov     word ptr ds:[22h], es
+	
+	mov     bx, ds:[24h]
+	mov     word ptr cs:[oldint9], bx
+	mov     bx, ds:[26h]
+	mov     word ptr cs:[oldint9+2], bx
+
+	mov     word ptr ds:[24h], offset KeyHandler
+	mov     word ptr ds:[26h], cs
+	
+	pop     ds
+	sti
+	
+	; Turn off floppy motor so we can hear more clearly
+	mov		dx, 03F2h
+	mov		al, 0Ch
+	out		dx, al
+	
+	call InitPCSpeaker
+
+mainloop:
+	
+	
+
+	; Check if we need to mix anything
+sampleBufCheck:
+	mov ax, word ptr es:[sampleBufIns+2+32768]
+	
+	; Do we also need to relocate our handler?
+	cmp [timerHandlerHi], 0
+	jne checkTimerHi
+	
+checkTimerLo:
+	cmp ax, 32768 + (EndTimerHandler-TimerHandler+1)
+	ja doHandler
+	jmp doMixBuffer
+
+doHandler:	
+	; Copy handler to sample buffer hi position
+	add byte ptr ds:[sampleBufInc+4], 32768 shr 8
+	mov cx, (EndTimerHandler-TimerHandler+1)/2
+	mov si, offset TimerHandler
+	mov di, 32768
+	rep movsw
+	
+	; Adjust sample pointer
+	hlt
+	;cli
+	mov si, word ptr es:[sampleBufIns+2]
+	mov word ptr es:[sampleBufIns+2+32768], si
+	;sti
+	
+	push ds
+	xor si, si
+	mov ds, si
+	mov byte ptr ds:[20h+1], 32768 shr 8
+	pop ds
+
+	mov [timerHandlerHi], 1
+	mov word ptr cs:[sampleBufCheck+2], offset sampleBufIns+2+32768
+	
+IFDEF DEBUG
+	; Output character to indicate handler moved to hi
+	push ax
+	mov ah, 02h
+	mov dl, '+'
+	int 21h
+	pop ax
+ENDIF
+
+	call MixBuffer
+
+	jmp doMixBuffer
+	
+checkTimerHi:
+	cmp ax, 32768
+	jae doMixBuffer
+	cmp ax, (EndTimerHandler-TimerHandler+1)
+	jbe doMixBuffer
+	
+	; Copy handler to sample buffer lo position
+	add byte ptr ds:[sampleBufInc+4], 32768 shr 8
+	mov cx, (EndTimerHandler-TimerHandler+1)/2
+	mov si, offset TimerHandler
+	xor di, di
+	rep movsw
+	
+	; Adjust sample pointer
+	hlt
+	;cli
+	mov si, word ptr es:[sampleBufIns+2+32768]
+	mov word ptr es:[sampleBufIns+2], si
+	;sti
+	
+	push ds
+	xor si, si
+	mov ds, si
+	mov byte ptr ds:[20h+1], 0 shr 8
+	pop ds
+	
+	mov [timerHandlerHi], 0
+	mov word ptr cs:[sampleBufCheck+2], offset sampleBufIns+2
+	
+IFDEF DEBUG
+	; Output character to indicate handler moved to lo
+	push ax
+	mov ah, 02h
+	mov dl, '-'
+	int 21h
+	pop ax
+ENDIF
+
+	call MixBuffer
+	
+doMixBuffer:	
+	;cmp ax, cs:[mixPos]
+	;ja waitKey
+	;add ax, (BUFSIZE)
+	;cmp ax, cs:[mixPos]
+	;jb waitKey
+
+	;call MixBuffer
+	;mov ax, word ptr es:[sampleBufIns+2+32768]
+	;jmp doMixBuffer
+
+IFDEF DEBUG
+	; Output character to indicate speed
+	mov ah, 02h
+	mov dl, '.'
+	int 21h
+ENDIF
+	
+waitKey:
+	; Wait for keypress
+	cmp cs:[ending], 0
+	jne endMainLoop
+	jmp mainloop
+	
+endMainLoop:
+
+	; Close music stream file
+	mov ah, 03Eh
+	mov bx, cs:[file]
+	int 21h
+	
+	; Restore old handler
+	cli
+	push    ds
+	xor     bx,bx
+	mov     ds,bx
+	mov     bx,word ptr cs:[oldint8]
+	mov     ds:[20h],bx
+	mov     bx,word ptr cs:[oldint8+2]
+	mov     ds:[22h],bx
+
+	mov     bx,word ptr cs:[oldint9]
+	mov     ds:[24h],bx
+	mov     bx,word ptr cs:[oldint9+2]
+	mov     ds:[26h],bx
+
+	pop     ds
+	
+	; Restore timer interrupt speed
+	ResetPIT CHAN0
+	
+	sti
+
+	; Get PIC out of auto-EOI mode
+	mov cl, [machineType]
+	call RestorePIC
+	call ClosePCSpeaker
+	
+	; Free sample buffer
+	mov es, [sampleBufSeg]
+	mov ah, 49h
+	int 21h
+	
+err:
+	pop es
+	
+	; Restore interrupts
+	;mov al, [picMask]
+	;out PIC1_DATA, al
+	
+	; Exit program
+	mov ax, 4C00h
+	int 21h
+	
+; === End program ===
+	
+MixBuffer proc
+	push ds
+	mov ds, [sampleBufSeg]
+
+	; Read a block from file
+	mov ah, 03Fh
+	mov bx, cs:[file]
+	mov cx, BUFSIZE
+	mov dx, cs:[mixPos]
+	int 21h
+	jc @@EOF
+	cmp ax, BUFSIZE
+	je @@notEOF
+	
+@@EOF:
+	inc cs:[ending]
+	
+	; Entire buffer was not filled, fill remainder with 0s
+	mov cx, BUFSIZE
+	sub cx, ax
+	mov si, cs:[mixPos]
+	add si, ax
+	mov ax, 128	; Silence, for Covox?
+	rep stosb
+	
+@@notEOF:
+	add cs:[mixPos], BUFSIZE
+	
+	pop ds
+	
 	ret
-DoTick ENDP
+MixBuffer endp
+	
+; Put this code in the data segment, not executed directly, but copied into place
+.data
+assume cs:@data
+TimerHandler proc
+	push si
+	push ax
+	
+	; Load pointer to stream
+sampleBufIns:
+	mov si, 0000h
+	
+	; Get note count
+	segcs lodsb
+	test al, al
+	jz endHandler
+		
+	; Play notes
+	push cx
+	xor cx, cx
+	mov cl, al
+		
+noteLoop:
+	segcs lodsb
+	out 0C0h, al
+		
+	loop noteLoop
+		
+	pop cx
+		
+endHandler:
+	; Get delay value from stream
+	segcs lodsb
+	out CHAN0PORT, al
+	segcs lodsb
+	out CHAN0PORT, al
 
-filename	db "pcjr3.vgm",0
-playing		db 1
-pSong		dd 0
+	; Update pointer
+sampleBufInc:
+	mov word ptr cs:[sampleBufIns+32768+2], si
 
-fileHandle	dw ?
-fileSize	dd ?
+	pop ax		
+	pop si
+		
+	iret
+EndTimerHandler:
+TimerHandler endp
+
+.code
+KeyHandler proc
+	push ax
+	
+	; Read byte from keyboard
+	in al,060h
+	mov ah, al
+	; Acknowledge keyboard
+	in al, 061h
+	or al, 080h
+	out 061h, al
+	and al, 07Fh
+	out 061h, al
+	cmp ah, 1
+	jne exitKey
+	
+	mov cs:[ending], 2
+exitKey:
+
+	pop ax
+
+	iret
+KeyHandler endp
+
+InitPCSpeaker proc
+	cli
+
+	; Enable speaker and tie input pin to CTC Chan 2 by setting bits 1 and 0
+	in al, PPIPORTB
+	or al, 03
+	out PPIPORTB, al
+	
+	; Counter 2 count = 1 - terminate count quickly
+	InitPIT CHAN2, %(MODE0 or AMLOBYTE or BINARY), 1
+	
+	sti
+	
+	ret
+InitPCSpeaker endp
+
+ClosePCSpeaker proc
+	cli
+
+	; Disable speaker by clearing bits 1 and 0
+	in al, PPIPORTB
+	and al, not 03
+	out PPIPORTB, al
+	
+	; Reset timer
+	ResetPIT CHAN2
+	
+	sti
+	
+	ret
+ClosePCSpeaker endp
+
+.code
+ending	db	0
+timerHandlerHi	db	1
+mixPos	dw	0
+
+oldint8	dd	?
+oldint9	dd	?
+file dw ?
+
+.data
+fileName db "out.pre",0
+
+.data?  
+picMask		db	?
+machineType	db	?
+sampleBufSeg	dw	?
 
 END start
