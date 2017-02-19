@@ -55,7 +55,7 @@ start:
 	
 	; Preprocess sample
 REPT NUMBUF
-	call MixBuffer
+	call LoadBuffer
 ENDM
 
 	; Get PIC into auto-EOI mode
@@ -123,7 +123,7 @@ sampleBufCheck:
 checkTimerLo:
 	cmp ax, 32768 + (EndTimerHandler-TimerHandler+1)
 	ja doHandler
-	jmp doMixBuffer
+	jmp waitKey
 
 doHandler:	
 	; Copy handler to sample buffer hi position
@@ -158,15 +158,15 @@ IFDEF DEBUG
 	pop ax
 ENDIF
 
-	call MixBuffer
+	call LoadBuffer
 
-	jmp doMixBuffer
+	jmp waitKey
 	
 checkTimerHi:
 	cmp ax, 32768
-	jae doMixBuffer
+	jae waitKey
 	cmp ax, (EndTimerHandler-TimerHandler+1)
-	jbe doMixBuffer
+	jbe waitKey
 	
 	; Copy handler to sample buffer lo position
 	add byte ptr ds:[sampleBufInc+4], 32768 shr 8
@@ -200,19 +200,9 @@ IFDEF DEBUG
 	pop ax
 ENDIF
 
-	call MixBuffer
+	call LoadBuffer
 	
-doMixBuffer:	
-	;cmp ax, cs:[mixPos]
-	;ja waitKey
-	;add ax, (BUFSIZE)
-	;cmp ax, cs:[mixPos]
-	;jb waitKey
-
-	;call MixBuffer
-	;mov ax, word ptr es:[sampleBufIns+1+32768]
-	;jmp doMixBuffer
-
+waitKey:
 IFDEF DEBUG
 	; Output character to indicate speed
 	mov ah, 02h
@@ -220,13 +210,31 @@ IFDEF DEBUG
 	int 21h
 ENDIF
 	
-waitKey:
 	; Wait for keypress or end of file
 	cmp cs:[ending], 0
 	ja endMainLoop
 	jmp mainloop
 	
 endMainLoop:
+	; Wait for player to pass 'mixPos'
+	cmp [timerHandlerHi], 0
+	jne checkTimerHi2
+	
+	; Routine is in 'low' position, so sample played in hi buffer
+	mov ax, word ptr es:[sampleBufIns+1]
+	cmp ax, cs:[mixPos]
+	jb waitKey2
+	inc cs:[ending]
+	jmp waitKey2
+	
+checkTimerHi2:
+	; Routine is in 'hi' position
+	mov ax, word ptr es:[sampleBufIns+1+32768]
+	cmp ax, cs:[mixPos]
+	jb waitKey2
+	inc cs:[ending]
+
+waitKey2:
 	; Wait for keypress
 	cmp cs:[ending], 2
 	jb endMainLoop
@@ -282,10 +290,7 @@ err:
 	
 ; === End program ===
 	
-MixBuffer proc
-	cmp cs:[ending], 0
-	jne @@endMixBuffer
-
+LoadBuffer proc
 	push ds
 	mov ds, [sampleBufSeg]
 
@@ -302,22 +307,13 @@ MixBuffer proc
 @@EOF:
 	inc cs:[ending]
 	
-	; Entire buffer was not filled, fill remainder with 0s
-	;mov cx, BUFSIZE
-	;sub cx, ax
-	;mov si, cs:[mixPos]
-	;add si, ax
-	;mov ax, 0	; No commands
-	;rep stosb
-	
 @@notEOF:
-	add cs:[mixPos], BUFSIZE
+	add cs:[mixPos], ax
 	
 	pop ds
 
-@@endMixBuffer:
 	ret
-MixBuffer endp
+LoadBuffer endp
 	
 ; Put this code in the data segment, not executed directly, but copied into place
 .data
