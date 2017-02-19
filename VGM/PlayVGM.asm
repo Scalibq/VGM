@@ -70,9 +70,9 @@ ENDM
 	rep movsw
 	
 	; Turn off floppy motor so we can hear more clearly
-	mov		dx, 03F2h
-	mov		al, 0Ch
-	out		dx, al
+	;mov		dx, 03F2h
+	;mov		al, 0Ch
+	;out		dx, al
 	
 	;call InitPCSpeaker
 	call InitPCjrAudio
