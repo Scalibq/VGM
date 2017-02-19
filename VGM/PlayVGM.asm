@@ -69,14 +69,19 @@ ENDM
 	mov di, 32768
 	rep movsw
 	
+	; Turn off floppy motor so we can hear more clearly
+	mov		dx, 03F2h
+	mov		al, 0Ch
+	out		dx, al
+	
+	;call InitPCSpeaker
+	call InitPCjrAudio
+
 	; Install our own handler	
 	cli
 
 	InitPIT CHAN0, %(MODE2 or AMBOTH or BINARY), 2
 	
-	; TODO: get the interrupt started with the first delay
-	
-
 	push    ds
 	xor     bx, bx
 	mov     ds, bx
@@ -97,20 +102,16 @@ ENDM
 	mov     word ptr ds:[26h], cs
 	
 	pop     ds
+
+	; Now initialize the counter with the first count
+	seges lodsb
+	out CHAN0PORT, al
+	seges lodsb
+	out CHAN0PORT, al
+
 	sti
 	
-	; Turn off floppy motor so we can hear more clearly
-	mov		dx, 03F2h
-	mov		al, 0Ch
-	out		dx, al
-	
-	;call InitPCSpeaker
-	call InitPCjrAudio
-
 mainloop:
-	
-	
-
 	; Check if we need to mix anything
 sampleBufCheck:
 	mov ax, word ptr es:[sampleBufIns+1+32768]
@@ -220,12 +221,15 @@ IFDEF DEBUG
 ENDIF
 	
 waitKey:
-	; Wait for keypress
+	; Wait for keypress or end of file
 	cmp cs:[ending], 0
-	jne endMainLoop
+	ja endMainLoop
 	jmp mainloop
 	
 endMainLoop:
+	; Wait for keypress
+	cmp cs:[ending], 2
+	jb endMainLoop
 
 	; Close music stream file
 	mov ah, 03Eh
@@ -279,6 +283,9 @@ err:
 ; === End program ===
 	
 MixBuffer proc
+	cmp cs:[ending], 0
+	jne @@endMixBuffer
+
 	push ds
 	mov ds, [sampleBufSeg]
 
@@ -296,18 +303,19 @@ MixBuffer proc
 	inc cs:[ending]
 	
 	; Entire buffer was not filled, fill remainder with 0s
-	mov cx, BUFSIZE
-	sub cx, ax
-	mov si, cs:[mixPos]
-	add si, ax
-	mov ax, 128	; Silence, for Covox?
-	rep stosb
+	;mov cx, BUFSIZE
+	;sub cx, ax
+	;mov si, cs:[mixPos]
+	;add si, ax
+	;mov ax, 0	; No commands
+	;rep stosb
 	
 @@notEOF:
 	add cs:[mixPos], BUFSIZE
 	
 	pop ds
-	
+
+@@endMixBuffer:
 	ret
 MixBuffer endp
 	
@@ -320,7 +328,7 @@ TimerHandler proc
 	
 	; Load pointer to stream
 sampleBufIns:
-	mov si, 0000h
+	mov si, 0002h	; Start at byte 2, to skip the first delay command
 	
 	; Get note count
 	segcs lodsb
