@@ -216,13 +216,13 @@ ENDIF
 	jmp mainloop
 	
 endMainLoop:
-	; Wait for player to pass 'mixPos'
+	; Wait for player to pass 'bufPos'
 	cmp [timerHandlerHi], 0
 	jne checkTimerHi2
 	
 	; Routine is in 'low' position, so sample played in hi buffer
 	mov ax, word ptr es:[sampleBufIns+1]
-	cmp ax, cs:[mixPos]
+	cmp ax, cs:[bufPos]
 	jb waitKey2
 	inc cs:[ending]
 	jmp waitKey2
@@ -230,7 +230,7 @@ endMainLoop:
 checkTimerHi2:
 	; Routine is in 'hi' position
 	mov ax, word ptr es:[sampleBufIns+1+32768]
-	cmp ax, cs:[mixPos]
+	cmp ax, cs:[bufPos]
 	jb waitKey2
 	inc cs:[ending]
 
@@ -298,7 +298,7 @@ LoadBuffer proc
 	mov ah, 03Fh
 	mov bx, cs:[file]
 	mov cx, BUFSIZE
-	mov dx, cs:[mixPos]
+	mov dx, cs:[bufPos]
 	int 21h
 	jc @@EOF
 	cmp ax, BUFSIZE
@@ -308,7 +308,7 @@ LoadBuffer proc
 	inc cs:[ending]
 	
 @@notEOF:
-	add cs:[mixPos], ax
+	add cs:[bufPos], ax
 	
 	pop ds
 
@@ -449,7 +449,7 @@ ClosePCjrAudio endp
 .code
 ending	db	0
 timerHandlerHi	db	1
-mixPos	dw	0
+bufPos	dw	0
 
 oldint8	dd	?
 oldint9	dd	?
