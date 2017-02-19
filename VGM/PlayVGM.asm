@@ -75,6 +75,7 @@ ENDM
 	InitPIT CHAN0, %(MODE2 or AMBOTH or BINARY), 2
 	
 	; TODO: get the interrupt started with the first delay
+	
 
 	push    ds
 	xor     bx, bx
@@ -103,7 +104,8 @@ ENDM
 	mov		al, 0Ch
 	out		dx, al
 	
-	call InitPCSpeaker
+	;call InitPCSpeaker
+	call InitPCjrAudio
 
 mainloop:
 	
@@ -255,7 +257,8 @@ endMainLoop:
 	; Get PIC out of auto-EOI mode
 	mov cl, [machineType]
 	call RestorePIC
-	call ClosePCSpeaker
+	;call ClosePCSpeaker
+	call ClosePCjrAudio
 	
 	; Free sample buffer
 	mov es, [sampleBufSeg]
@@ -410,6 +413,34 @@ ClosePCSpeaker proc
 	
 	ret
 ClosePCSpeaker endp
+
+InitPCjrAudio proc
+	; Audio Multiplexer is Int1A AH=80 AL=Audio source (0=PC speaker, 1=Cassette, 2=I/O channel "Audio In", 3=SN76496).
+	mov al, 3
+	int 1Ah
+	
+	ret
+InitPCjrAudio endp
+
+ClosePCjrAudio proc
+	; Silence all SN76489 channels
+	mov dx, 0C0h
+	mov al, 0FFh
+	out dx, al
+	mov al, 0BFh
+	out dx, al
+	mov al, 0DFh
+	out dx, al
+	mov al, 09Fh
+	out dx, al
+	
+	; Reset the multiplexor
+	; Audio Multiplexer is Int1A AH=80 AL=Audio source (0=PC speaker, 1=Cassette, 2=I/O channel "Audio In", 3=SN76496).
+	mov al, 0
+	int 1Ah
+	
+	ret
+ClosePCjrAudio endp
 
 .code
 ending	db	0
