@@ -228,8 +228,10 @@ endMainLoop:
 	jmp waitKey2
 	
 checkTimerHi2:
-	; Routine is in 'hi' position
+	; Routine is in 'hi' position, so sample played in lo buffer
 	mov ax, word ptr es:[sampleBufIns+1+32768]
+	cmp ax, BUFSIZE
+	jae waitKey2
 	cmp ax, cs:[bufPos]
 	jb waitKey2
 	inc cs:[ending]
