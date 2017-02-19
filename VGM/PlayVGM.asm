@@ -111,7 +111,7 @@ mainloop:
 
 	; Check if we need to mix anything
 sampleBufCheck:
-	mov ax, word ptr es:[sampleBufIns+2+32768]
+	mov ax, word ptr es:[sampleBufIns+1+32768]
 	
 	; Do we also need to relocate our handler?
 	cmp [timerHandlerHi], 0
@@ -133,8 +133,8 @@ doHandler:
 	; Adjust sample pointer
 	hlt
 	;cli
-	mov si, word ptr es:[sampleBufIns+2]
-	mov word ptr es:[sampleBufIns+2+32768], si
+	mov si, word ptr es:[sampleBufIns+1]
+	mov word ptr es:[sampleBufIns+1+32768], si
 	;sti
 	
 	push ds
@@ -144,7 +144,7 @@ doHandler:
 	pop ds
 
 	mov [timerHandlerHi], 1
-	mov word ptr cs:[sampleBufCheck+2], offset sampleBufIns+2+32768
+	mov word ptr cs:[sampleBufCheck+2], offset sampleBufIns+1+32768
 	
 IFDEF DEBUG
 	; Output character to indicate handler moved to hi
@@ -175,8 +175,8 @@ checkTimerHi:
 	; Adjust sample pointer
 	hlt
 	;cli
-	mov si, word ptr es:[sampleBufIns+2+32768]
-	mov word ptr es:[sampleBufIns+2], si
+	mov si, word ptr es:[sampleBufIns+1+32768]
+	mov word ptr es:[sampleBufIns+1], si
 	;sti
 	
 	push ds
@@ -186,7 +186,7 @@ checkTimerHi:
 	pop ds
 	
 	mov [timerHandlerHi], 0
-	mov word ptr cs:[sampleBufCheck+2], offset sampleBufIns+2
+	mov word ptr cs:[sampleBufCheck+2], offset sampleBufIns+1
 	
 IFDEF DEBUG
 	; Output character to indicate handler moved to lo
@@ -207,7 +207,7 @@ doMixBuffer:
 	;jb waitKey
 
 	;call MixBuffer
-	;mov ax, word ptr es:[sampleBufIns+2+32768]
+	;mov ax, word ptr es:[sampleBufIns+1+32768]
 	;jmp doMixBuffer
 
 IFDEF DEBUG
@@ -346,7 +346,7 @@ endHandler:
 
 	; Update pointer
 sampleBufInc:
-	mov word ptr cs:[sampleBufIns+32768+2], si
+	mov word ptr cs:[sampleBufIns+32768+1], si
 
 	pop ax		
 	pop si
