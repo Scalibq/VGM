@@ -39,6 +39,9 @@ typedef struct
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
 #define SampleRate 44100
 
+#define DIVISOR		(55411U)	/* (1193182.0f/44100.0f) * 2048 */
+#define	DIVISOR_SHIFT	(11U)
+
 uint16_t SNReg = 0xC0;
 
 void SetTimerCount(uint16_t rate);
@@ -278,7 +281,8 @@ int keypressed(uint8_t* pChar)
 }
 
 int playing = 1;
-uint32_t delayTable[4096];
+#define DELAY_TABLE	4096
+uint32_t delayTable[DELAY_TABLE];
 
 // Buffer format:
 // uint16_t delay;
@@ -571,108 +575,92 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 						delay = delayTable[srcDelay];
 					else
 					{
-						/*
 						delay = srcDelay;
-						delay *= (PITFREQ >> 5);
-						delay /= (SampleRate >> 5);
-						*/
-						double fDelay = srcDelay;
-						fDelay *= PITFREQ;
-						fDelay /= SampleRate;
-						delay = (uint32_t)(fDelay + 0.5);
+						delay *= DIVISOR;
+						delay >>= DIVISOR_SHIFT;
 					}
 					
 					goto endDelay;
 					break;
 				}
-			case 0x62:	// wait 1/60th second
-				delay = (uint32_t)((PITFREQ / 60.0) + 0.5);
-				//printf("Delay: %u ticks\n", SampleRate/60);
+			case 0x62:	// wait 1/60th second: 735 samples
+#if (DELAY_TABLE > 735)
+				delay = delayTable[735];
+#else
+				delay = (PITFREQ / 60);
+#endif
 				goto endDelay;
 				break;
-			case 0x63:	// wait 1/50th second
-				delay = (uint32_t)((PITFREQ / 50.0) + 0.5);
-				//printf("Delay: %u ticks\n", SampleRate/50);
+			case 0x63:	// wait 1/50th second: 882 samples
+#if (DELAY_TABLE > 882)
+				delay = delayTable[882];
+#else
+				delay = (PITFREQ / 50);
+#endif
 				goto endDelay;
 				break;
 			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*1.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 1);
+				delay = delayTable[1];
 				goto endDelay;
 				break;
 			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*2.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 2);
+				delay = delayTable[2];
 				goto endDelay;
 				break;
 			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*3.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 3);
+				delay = delayTable[3];
 				goto endDelay;
 				break;
 			case 0x73:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*4.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 4);
+				delay = delayTable[4];
 				goto endDelay;
 				break;
 			case 0x74:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*5.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 5);
+				delay = delayTable[5];
 				goto endDelay;
 				break;
 			case 0x75:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*6.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 6);
+				delay = delayTable[6];
 				goto endDelay;
 				break;
 			case 0x76:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*7.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 7);
+				delay = delayTable[7];
 				goto endDelay;
 				break;
 			case 0x77:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*8.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 8);
+				delay = delayTable[8];
 				goto endDelay;
 				break;
 			case 0x78:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*9.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 9);
+				delay = delayTable[9];
 				goto endDelay;
 				break;
 			case 0x79:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*10.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 10);
+				delay = delayTable[10];
 				goto endDelay;
 				break;
 			case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*11.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 11);
+				delay = delayTable[11];
 				goto endDelay;
 				break;
 			case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*12.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 12);
+				delay = delayTable[12];
 				goto endDelay;
 				break;
 			case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*13.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 13);
+				delay = delayTable[13];
 				goto endDelay;
 				break;
 			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*14.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 14);
+				delay = delayTable[14];
 				goto endDelay;
 				break;
 			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*15.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 15);
+				delay = delayTable[15];
 				goto endDelay;
 				break;
 			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
-				delay = (uint32_t)(((PITFREQ*16.0) / SampleRate) + 0.5);
-				//printf("Delay: %u ticks\n", 16);
+				delay = delayTable[16];
 				goto endDelay;
 				break;
 			default:
@@ -1299,9 +1287,6 @@ int main(int argc, char* argv[])
 	
 	//InitSampleSN76489();
 	//InitSamplePIT();
-	
-#define DIVISOR		(55411U)	/* (1193182.0f/44100.0f) * 2048 */
-#define	DIVISOR_SHIFT	(11U)
 	
 	// Prepare delay table
 	delayTable[0] = 2;
