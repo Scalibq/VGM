@@ -14,6 +14,47 @@ LOCALS @@
 
 .code
 start:
+	; Retrieve filename from commandline
+    ; At program start, DOS sets DS to point to the the PSP.
+    mov     bl, ds:[80h]             ;get length of command-line
+    cmp     bl, 0                    ;is it empty?
+    jne     getfname                 ;if not, get filename; else, abort
+
+    ; Print usage message, then exit
+	; Set DS to .data
+	mov ax, @data
+	mov ds, ax
+    mov     ah, 9
+    mov     dx, offset usageSt
+    int     21h
+    mov     ax, 4C00h
+    int     21h
+
+	; Retrieve filename from PSP
+getfname:
+	int 3
+	push es
+
+    mov     ax, @data
+    mov     es, ax                   ;es = data segment, ds = psp
+    mov     ax, ds
+    mov     es:[PSP], ax             ;store PSP to data var just in case
+    xor     cx, cx
+    mov     cl, 80h                  ;grab length of filename
+    dec     cl                       ;adjust for skipping leading space
+    mov     si, 82h                  ;ds:si = name start (skip lead spc)
+    mov     di, offset fileName      ;es:di = our filename var
+@getf:
+	lodsb
+    cmp     al, ' '                   ;is it a space? (ie. more on cmdline)
+    je      @abort                  ;abort if it is
+    cmp     al, 0dh                  ;is it ENTER?
+    je      @abort                  ;abort if it is
+    stosb                           ;otherwise, store it to our var
+    loop    @getf
+@abort:
+
+	pop es
 	push es
 
 	; Set DS to .data
@@ -52,6 +93,15 @@ start:
 	mov dx, offset fileName
 	int 21h
 	mov cs:[file], ax
+	jnc fileOpen
+	
+	; File did not open correctly?
+    mov     ah, 9
+    mov     dx, offset errorFile
+    int     21h
+	jmp err
+	
+fileOpen:
 	
 	; Preprocess sample
 REPT NUMBUF
@@ -458,11 +508,15 @@ oldint9	dd	?
 file dw ?
 
 .data
-fileName db "out.pre",0
+usageSt db "Usage: PlayVGM <filename.ext>",0dh,0ah,'$'
+errorFile db "Unable to open file!",0dh,0ah,'$'
+;fileName db "out.pre",0
+fileName  db 126 DUP (0)
 
 .data?  
 picMask		db	?
 machineType	db	?
 sampleBufSeg	dw	?
+PSP             dw      ?
 
 END start
