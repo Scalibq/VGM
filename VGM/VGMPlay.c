@@ -1300,20 +1300,17 @@ int main(int argc, char* argv[])
 	//InitSampleSN76489();
 	//InitSamplePIT();
 	
+#define DIVISOR		(55411U)	/* (1193182.0f/44100.0f) * 2048 */
+#define	DIVISOR_SHIFT	(11U)
+	
 	// Prepare delay table
 	delayTable[0] = 2;
 	for (i = 1; i < _countof(delayTable); i++)
 	{
 		uint32_t delay = i;
 
-		/*
-		delay *= (PITFREQ >> 5);
-		delay /= (SampleRate >> 5);
-		*/
-		double fDelay = delay;
-		fDelay *= PITFREQ;
-		fDelay /= SampleRate;
-		delay = (uint32_t)(fDelay + 0.5);
+		delay *= DIVISOR;
+		delay >>= DIVISOR_SHIFT;
 		
 		delayTable[i] = delay;
 	}
