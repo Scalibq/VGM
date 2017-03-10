@@ -42,6 +42,8 @@ typedef struct
 #define DIVISOR		(55411U)	/* (1193182.0f/44100.0f) * 2048 */
 #define	DIVISOR_SHIFT	(11U)
 
+#define GETDELAY(n)	((uint32_t)(n*(uint32_t)DIVISOR) >> DIVISOR_SHIFT)
+
 uint16_t SNReg = 0xC0;
 
 void SetTimerCount(uint16_t rate);
@@ -281,8 +283,7 @@ int keypressed(uint8_t* pChar)
 }
 
 int playing = 1;
-#define DELAY_TABLE	4096
-uint32_t delayTable[DELAY_TABLE];
+uint32_t delayTable[4096];
 
 // Buffer format:
 // uint16_t delay;
@@ -574,93 +575,81 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 					if (srcDelay < _countof(delayTable))
 						delay = delayTable[srcDelay];
 					else
-					{
-						delay = srcDelay;
-						delay *= DIVISOR;
-						delay >>= DIVISOR_SHIFT;
-					}
+						delay = GETDELAY(srcDelay);
 					
 					goto endDelay;
 					break;
 				}
 			case 0x62:	// wait 1/60th second: 735 samples
-#if (DELAY_TABLE > 735)
-				delay = delayTable[735];
-#else
-				delay = (PITFREQ / 60);
-#endif
+				delay = GETDELAY(735);
 				goto endDelay;
 				break;
 			case 0x63:	// wait 1/50th second: 882 samples
-#if (DELAY_TABLE > 882)
-				delay = delayTable[882];
-#else
-				delay = (PITFREQ / 50);
-#endif
+				delay = GETDELAY(882);
 				goto endDelay;
 				break;
 			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[1];
+				delay = GETDELAY(1);
 				goto endDelay;
 				break;
 			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[2];
+				delay = GETDELAY(2);
 				goto endDelay;
 				break;
 			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[3];
+				delay = GETDELAY(3);
 				goto endDelay;
 				break;
 			case 0x73:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[4];
+				delay = GETDELAY(4);
 				goto endDelay;
 				break;
 			case 0x74:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[5];
+				delay = GETDELAY(5);
 				goto endDelay;
 				break;
 			case 0x75:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[6];
+				delay = GETDELAY(6);
 				goto endDelay;
 				break;
 			case 0x76:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[7];
+				delay = GETDELAY(7);
 				goto endDelay;
 				break;
 			case 0x77:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[8];
+				delay = GETDELAY(8);
 				goto endDelay;
 				break;
 			case 0x78:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[9];
+				delay = GETDELAY(9);
 				goto endDelay;
 				break;
 			case 0x79:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[10];
+				delay = GETDELAY(10);
 				goto endDelay;
 				break;
 			case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[11];
+				delay = GETDELAY(11);
 				goto endDelay;
 				break;
 			case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[12];
+				delay = GETDELAY(12);
 				goto endDelay;
 				break;
 			case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[13];
+				delay = GETDELAY(13);
 				goto endDelay;
 				break;
 			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[14];
+				delay = GETDELAY(14);
 				goto endDelay;
 				break;
 			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[15];
+				delay = GETDELAY(15);
 				goto endDelay;
 				break;
 			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
-				delay = delayTable[16];
+				delay = GETDELAY(16);
 				goto endDelay;
 				break;
 			default:
@@ -1291,14 +1280,7 @@ int main(int argc, char* argv[])
 	// Prepare delay table
 	delayTable[0] = 2;
 	for (i = 1; i < _countof(delayTable); i++)
-	{
-		uint32_t delay = i;
-
-		delay *= DIVISOR;
-		delay >>= DIVISOR_SHIFT;
-		
-		delayTable[i] = delay;
-	}
+		delayTable[i] = GETDELAY(i);
 	
 	//PlayPoll1(argv[1]);
 	//PlayPoll2(argv[1]);
