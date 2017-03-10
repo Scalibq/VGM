@@ -282,7 +282,7 @@ int keypressed(uint8_t* pChar)
 	return ret;
 }
 
-int playing = 1;
+volatile int playing = 1;
 uint32_t delayTable[4096];
 
 // Buffer format:
@@ -1073,6 +1073,9 @@ void PlayPolled2(void)
 	//_enable();
 }
 
+void interrupt (*OldTimerHandler)(void);
+void interrupt (*OldKeyHandler)(void);
+
 void interrupt HandlerC(void)
 {
 	uint8_t count;
@@ -1090,7 +1093,25 @@ void interrupt HandlerC(void)
 	pBuf = (uint8_t huge*)pW;
 }
 
-void interrupt (*OldInt8)(void);
+void interrupt KeyHandler()
+{
+	uint8_t key;
+	uint8_t ack;
+	
+	// Read byte from keyboard
+	key = inp(0x60);
+	// Acknowledge keyboard
+	ack = inp(0x61);
+	ack |= 0x80;
+	outp(0x61, ack);
+	ack &= 0x7F;
+	outp(0x61, ack);
+	
+	if (key == 1)
+		playing = 0;
+	
+	outp(PIC1_COMMAND, OCW2_EOI);
+}
 
 void SetTimerRate(uint16_t rate)
 {
@@ -1109,13 +1130,24 @@ void SetTimerCount(uint16_t rate)
 
 void InitHandler(void)
 {
-	OldInt8 = _dos_getvect(0x8);
-	_dos_setvect(0x8, HandlerC);
+	OldTimerHandler = _dos_getvect(0x0 + 0x8);
+	_dos_setvect(0x0 + 0x8, HandlerC);
 }
 
 void DeinitHandler(void)
 {
-	_dos_setvect(0x8, OldInt8);
+	_dos_setvect(0x0 + 0x8, OldTimerHandler);
+}
+
+void InitKeyHandler(void)
+{
+	OldKeyHandler = _dos_getvect(0x1 + 0x8);
+	_dos_setvect(0x1 + 0x8, KeyHandler);
+}
+
+void DeinitKeyHandler(void)
+{
+	_dos_setvect(0x1 + 0x8, OldKeyHandler);
 }
 
 MachineType machineType;
@@ -1282,10 +1314,14 @@ int main(int argc, char* argv[])
 	for (i = 1; i < _countof(delayTable); i++)
 		delayTable[i] = GETDELAY(i);
 	
+	InitKeyHandler();
+	
 	//PlayPoll1(argv[1]);
 	//PlayPoll2(argv[1]);
 	//PlayPoll3(argv[1]);
 	PlayInt(argv[1]);
+	
+	DeinitKeyHandler();
 	
 	farfree(pPreprocessed);
 	
