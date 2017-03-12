@@ -445,18 +445,18 @@ void PlayBuffer2C()
 	{
 		// Perform waiting
 		// max reasonable tickWait time is 50ms, so handle larger values in slices
-		if (currDelay == 0)
+		/*if (currDelay == 0)
 			totalDelay += 65536L;
 		else
 		{
 			totalDelay += currDelay;
 			tickWaitC(totalDelay, &currentTime);
 			totalDelay = 0;
-		}
-		/*if (currDelay == 0)
+		}*/
+		if (currDelay == 0)
 			tickWaitC(65536L, &currentTime);
 		else
-			tickWaitC(currDelay, &currentTime);*/
+			tickWaitC(currDelay, &currentTime);
 
 		// Loop through all command-data
 		count = *pBuf++;
@@ -700,8 +700,8 @@ void PlayImmediate(const char* pVGMFile)
 			continue;
 		}
 		
-		printf("Notes: %u, delay: %lu\n",
-			count, delay);
+		//printf("Notes: %u, delay: %lu\n",
+		//	count, delay);
 		
 		count = 0;
 
@@ -734,6 +734,7 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	size_t size;
 	uint16_t* pW;
 	uint16_t count, length;
+	uint16_t firstDelay;
 	
 	pFile = fopen(pVGMFile, "rb");	
 
@@ -934,34 +935,21 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 		//printf("Notes: %u, delay: %lu\n",
 		//	count, delay);
 		
-		// First write delay value
-		pDelays = delays;
-		
 		// Break up into multiple delays with no notes
-		while (delay >= 65536L)
+		if (delay >= 65536L)
 		{
+			firstDelay = 0;
 			delay -= 65536L;
-			pW = (uint16_t*)pDelays;
-			*pW++ = 0;
-			pDelays = (uint8_t*)pW;
-		
-			// Don't put empty note data at the last delay
-			if (delay > 1)
-				*pDelays++ = 0;
 		}
-	
-		// Last delay
-		if (delay > 1)
+		else
 		{
-			pW = (uint16_t*)pDelays;
-			*pW++ = delay;
-			pDelays = (uint8_t*)pW;
+			firstDelay = delay;
+			delay = 0;
 		}
 		
-		// Write to disk
-		size = pDelays - delays;
-		fwrite(delays, size, 1, pOut);
-		
+		// First write delay value
+		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+
 		// Now output commands
 		if (count > 255)
 			printf("Too many commands: %u!\n", count);
@@ -970,6 +958,39 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 
 		// Reset command buffer
 		pCommands = commands + 1;
+			
+		// Emit remaining delays, if any
+		if (delay == 0)
+			continue;
+
+		pDelays = delays;
+			
+		while (delay >= 65536L)
+		{
+			delay -= 65536L;
+
+			pW = (uint16_t*)pDelays;
+			*pW++ = 0;
+			pDelays = (uint8_t*)pW;
+				
+			// Output 0 notes
+			if (delay > 1)
+				*pDelays++ = 0;
+		}
+		
+		// Last delay
+		if (delay > 1)
+		{
+			pW = (uint16_t*)pDelays;
+			*pW++ = delay;
+			pDelays = (uint8_t*)pW;
+				
+			*pDelays++ = 0;
+		}
+		
+		// Write to disk
+		size = pDelays - delays;
+		fwrite(delays, size, 1, pOut);
 	}
 	
 	// Output last delay of 0
@@ -1599,10 +1620,10 @@ int main(int argc, char* argv[])
 	
 	InitKeyHandler();
 	
-	PlayPoll1(argv[1]);
+	//PlayPoll1(argv[1]);
 	//PlayPoll2(argv[1]);
 	//PlayPoll3(argv[1]);
-	//PlayInt(argv[1]);
+	PlayInt(argv[1]);
 	//PlayImmediate(argv[1]);
 	
 	DeinitKeyHandler();
