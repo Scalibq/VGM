@@ -302,7 +302,7 @@ void PlayBuffer2()
 	uint32_t currDelay, nextDelay;
 	
 	// Disable interrupts
-	_disable();
+	//_disable();
 	
 	// Get LSB of timer counter
 	currentTime = inp(CHAN0PORT);
@@ -404,12 +404,12 @@ void PlayBuffer2()
 		pBuf = (uint8_t far*)pW;
 		
 		// handle input
-		if (keypressed(NULL))
-			playing = 0;
+		if (playing == 0)
+			break;
 	}
 	
 	// Re-enable interrupts
-	_enable();
+	//_enable();
 }
 
 void PlayBuffer2C()
@@ -420,7 +420,7 @@ void PlayBuffer2C()
 	uint32_t currDelay, nextDelay;
 	
 	// Disable interrupts
-	_disable();
+	//_disable();
 	
 	// Get LSB of timer counter
 	currentTime = inp(CHAN0PORT);
@@ -445,7 +445,7 @@ void PlayBuffer2C()
 		if (currDelay == 0)
 			currDelay = 65536L;
 
-		tickWait(currDelay, &currentTime);
+		tickWaitC(currDelay, &currentTime);
 
 		// Loop through all command-data
 		count = *pBuf++;
@@ -464,12 +464,12 @@ void PlayBuffer2C()
 		pBuf = (uint8_t far*)pW;
 		
 		// handle input
-		if (keypressed(NULL))
-			playing = 0;
+		if (playing == 0)
+			break;
 	}
 	
 	// Re-enable interrupts
-	_enable();
+	//_enable();
 }
 
 void PlayImmediate(const char* pVGMFile)
@@ -480,6 +480,7 @@ void PlayImmediate(const char* pVGMFile)
 	VGMHeader header;
 	uint32_t idx;
 	uint32_t currentTime;
+	uint16_t count;
 	
 	pFile = fopen(pVGMFile, "rb");	
 
@@ -536,6 +537,8 @@ void PlayImmediate(const char* pVGMFile)
 	// Count down from maximum
 	currentTime |= 0xFFFF0000l;
 	
+	count = 0;
+
 	while (playing)
 	{
 		uint8_t value = fgetc(pFile);
@@ -553,6 +556,8 @@ void PlayImmediate(const char* pVGMFile)
 			case 0x5A:	// aa dd : YM3812, write value dd to register aa
 				outp(0x388, fgetc(pFile));
 				outp(0x389, fgetc(pFile));
+				
+				count++;
 				break;
 			case 0x51:	// aa dd : YM2413, write value dd to register aa
 			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
@@ -664,7 +669,7 @@ void PlayImmediate(const char* pVGMFile)
 				goto endDelay;
 				break;
 			default:
-				printf("PreProcessVGM(): Invalid: %02X\n", value);
+				printf("PlayImmediate(): Invalid: %02X\n", value);
 				break;
 		}
 		
@@ -684,6 +689,11 @@ void PlayImmediate(const char* pVGMFile)
 			continue;
 		}
 		
+		printf("Notes: %u, delay: %lu\n",
+			count, delay);
+		
+		count = 0;
+
 		// Perform delay
 		tickWaitC(delay, &currentTime);
 	}
@@ -696,7 +706,6 @@ void PlayImmediate(const char* pVGMFile)
 
 	printf("Done playing VGM\n");
 }
-
 
 void SavePreprocessed(const char* pFileName);
 
@@ -907,38 +916,41 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 			printf("Extremely small delay encountered: %lu. Skipping\n", delay);
 			continue;
 		}
+		
+		length = pCommands - commands; 
+		count = (length - 1) / 2;
 	
+		//printf("Notes: %u, delay: %lu\n",
+		//	count, delay);
+		
 		// First write delay value
 		pDelays = delays;
 		
 		// Break up into multiple delays with no notes
-		while (delay >= 65536L)
+		while (delay > 65536L)
 		{
 			delay -= 65536L;
 			pW = (uint16_t*)pDelays;
 			*pW++ = 0;
 			pDelays = (uint8_t*)pW;
 		
-			// Don't put empty note data at the last delay
-			if (delay > 1)
-				*pDelays++ = 0;
+			// Add block of 0 notes
+			*pDelays++ = 0;
 		}
 	
 		// Last delay
-		if (delay > 1)
-		{
-			pW = (uint16_t*)pDelays;
-			*pW++ = delay;
-			pDelays = (uint8_t*)pW;
-		}
+		if (delay == 65536L)
+			delay = 0;
+		
+		pW = (uint16_t*)pDelays;
+		*pW++ = delay;
+		pDelays = (uint8_t*)pW;
 		
 		// Write to disk
 		size = pDelays - delays;
 		fwrite(delays, size, 1, pOut);
 		
 		// Now output commands
-		length = pCommands - commands; 
-		count = (length - 1) / 2;
 		if (count > 255)
 			printf("Too many commands: %u!\n", count);
 		commands[0] = count;
@@ -1575,11 +1587,11 @@ int main(int argc, char* argv[])
 	
 	InitKeyHandler();
 	
-	//PlayPoll1(argv[1]);
+	PlayPoll1(argv[1]);
 	//PlayPoll2(argv[1]);
 	//PlayPoll3(argv[1]);
 	//PlayInt(argv[1]);
-	PlayImmediate(argv[1]);
+	//PlayImmediate(argv[1]);
 	
 	DeinitKeyHandler();
 	
