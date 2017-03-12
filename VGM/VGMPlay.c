@@ -417,7 +417,8 @@ void PlayBuffer2C()
 	uint16_t far* pW;
 	uint8_t count;
 	uint32_t currentTime;
-	uint32_t currDelay, nextDelay;
+	uint16_t currDelay, nextDelay;
+	uint32_t totalDelay;
 	
 	// Disable interrupts
 	//_disable();
@@ -438,14 +439,24 @@ void PlayBuffer2C()
 	nextDelay = *pW++;
 	pBuf = (uint8_t far*)pW;
 	
+	totalDelay =  0;
+	
 	while (pBuf < pEndBuf)
 	{
 		// Perform waiting
 		// max reasonable tickWait time is 50ms, so handle larger values in slices
 		if (currDelay == 0)
-			currDelay = 65536L;
-
-		tickWaitC(currDelay, &currentTime);
+			totalDelay += 65536L;
+		else
+		{
+			totalDelay += currDelay;
+			tickWaitC(totalDelay, &currentTime);
+			totalDelay = 0;
+		}
+		/*if (currDelay == 0)
+			tickWaitC(65536L, &currentTime);
+		else
+			tickWaitC(currDelay, &currentTime);*/
 
 		// Loop through all command-data
 		count = *pBuf++;
@@ -927,24 +938,25 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 		pDelays = delays;
 		
 		// Break up into multiple delays with no notes
-		while (delay > 65536L)
+		while (delay >= 65536L)
 		{
 			delay -= 65536L;
 			pW = (uint16_t*)pDelays;
 			*pW++ = 0;
 			pDelays = (uint8_t*)pW;
 		
-			// Add block of 0 notes
-			*pDelays++ = 0;
+			// Don't put empty note data at the last delay
+			if (delay > 1)
+				*pDelays++ = 0;
 		}
 	
 		// Last delay
-		if (delay == 65536L)
-			delay = 0;
-		
-		pW = (uint16_t*)pDelays;
-		*pW++ = delay;
-		pDelays = (uint8_t*)pW;
+		if (delay > 1)
+		{
+			pW = (uint16_t*)pDelays;
+			*pW++ = delay;
+			pDelays = (uint8_t*)pW;
+		}
 		
 		// Write to disk
 		size = pDelays - delays;
