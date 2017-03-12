@@ -725,14 +725,10 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	FILE* pFile, *pOut;
 	uint32_t delay;
 	uint16_t srcDelay;
-	uint8_t delays[256];
 	uint8_t commands[256];
-	uint8_t* pDelays;
 	uint8_t* pCommands;
 	VGMHeader header;
 	uint32_t idx;
-	size_t size;
-	uint16_t* pW;
 	uint16_t count, length;
 	uint16_t firstDelay;
 	
@@ -929,76 +925,46 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 			continue;
 		}
 		
-		length = pCommands - commands; 
-		count = (length - 1) / 2;
-	
-		//printf("Notes: %u, delay: %lu\n",
-		//	count, delay);
-		
 		// Break up into multiple delays with no notes
-		if (delay >= 65536L)
+		while (delay > 1)
 		{
-			firstDelay = 0;
-			delay -= 65536L;
-		}
-		else
-		{
-			firstDelay = delay;
-			delay = 0;
-		}
+			length = pCommands - commands; 
+			count = (length - 1) / 2;
+	
+			//printf("Notes: %u, delay: %lu\n",
+			//	count, delay);
+
+			if (delay >= 65536L)
+			{
+				firstDelay = 0;
+				delay -= 65536L;
+			}
+			else
+			{
+				firstDelay = delay;
+				delay = 0;
+			}
 		
-		// First write delay value
-		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+			// First write delay value
+			fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
 
-		// Now output commands
-		if (count > 255)
-			printf("Too many commands: %u!\n", count);
-		commands[0] = count;
-		fwrite(commands, length, 1, pOut);
+			// Now output commands
+			if (count > 255)
+				printf("Too many commands: %u!\n", count);
+			commands[0] = count;
+			fwrite(commands, length, 1, pOut);
 
-		// Reset command buffer
-		pCommands = commands + 1;
-			
-		// Emit remaining delays, if any
-		if (delay == 0)
-			continue;
-
-		pDelays = delays;
-			
-		while (delay >= 65536L)
-		{
-			delay -= 65536L;
-
-			pW = (uint16_t*)pDelays;
-			*pW++ = 0;
-			pDelays = (uint8_t*)pW;
-				
-			// Output 0 notes
-			if (delay > 1)
-				*pDelays++ = 0;
+			// Reset command buffer
+			// (Next delays will get 0 notes exported
+			pCommands = commands + 1;
 		}
-		
-		// Last delay
-		if (delay > 1)
-		{
-			pW = (uint16_t*)pDelays;
-			*pW++ = delay;
-			pDelays = (uint8_t*)pW;
-				
-			*pDelays++ = 0;
-		}
-		
-		// Write to disk
-		size = pDelays - delays;
-		fwrite(delays, size, 1, pOut);
 	}
 	
 	// Output last delay of 0
-	pW = (uint16_t*)delays;
-	*pW++ = 0;
+	firstDelay = 0;
 
 	// Write to disk
-	fwrite(delays, sizeof(uint16_t), 1, pOut);
+	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
 	
 	// Output last set of commands
 	length = pCommands - commands; 
@@ -1009,7 +975,7 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	fwrite(commands, length, 1, pOut);
 	
 	// And a final delay of 0, which would get fetched by the last int handler
-	fwrite(delays, sizeof(uint16_t), 1, pOut);
+	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
 
 	fclose(pFile);
 	fclose(pOut);
