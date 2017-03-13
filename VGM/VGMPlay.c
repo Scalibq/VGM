@@ -45,7 +45,27 @@ typedef struct
 #define GETDELAY(n)	((uint32_t)(n*(uint32_t)DIVISOR) >> DIVISOR_SHIFT)
 //#define GETDELAY(n)	((uint32_t)(((n*(1193182.0/44100.0))+0.5)))
 
-uint16_t SNReg = 0xC0;
+// Index for each sound chip in a command stream
+#define I_SN76489 0
+#define I_SAA1099 1
+#define I_AY8930 2
+#define I_YM3812 3
+#define I_YMF262 4
+
+#define NUM_CHIPS 5
+#define NUM_PASSES 2
+
+// Flags for the different sound chips we support
+#define SN76489 (1 << I_SN76489)
+#define SAA1099 1 << I_SAA1099)
+#define AY8930 (1 << I_AY8930)
+#define YM3812 (1 << I_YM3812)
+#define YMF262 (1 << I_YMF262)
+
+uint8_t identifier[NUM_PASSES];
+uint16_t SNReg[NUM_PASSES] = { 0xC0, 0xC0 };
+uint16_t OPL2Reg[NUM_PASSES] = { 0x388, 0x388 };
+uint16_t OPL3Reg[NUM_PASSES] = { 0x220, 0x222 };
 
 void SetTimerCount(uint16_t rate);
 
@@ -97,12 +117,12 @@ void SetPCjrAudioPeriod(uint8_t chan, uint16_t period)
 	command = chan << 5;	// get voice reg in place
 	command |= 0x80;		// tell chip we are selecting a reg
 	command |= (period & 0xF);	// grab least sig 4 bits of period...
-	outp(SNReg,command);
+	outp(SNReg[0],command);
 	
     // build LSB
 	command = period >> 4;	// isolate upper 6 bits
 	//command &= 0x7F;		// clear bit 7 to indicate rest of freq
-    outp(SNReg,command);
+    outp(SNReg[0],command);
 }
 
 // Sets an SN voice with volume
@@ -123,7 +143,7 @@ void SetPCjrAudioVolume(uint8_t chan, uint8_t volume)
 	command = chan << 5;	// get voice reg in place
 	command |= 0x90;	// tell chip we're selecting a reg for volume
 	command |= volume;	// adjust to attenuation; register expects 0 = full, 15 = quiet
-	outp(SNReg, command);
+	outp(SNReg[0], command);
 }
 
 // Sets an SN voice with volume and a desired frequency
@@ -395,7 +415,7 @@ void PlayBuffer2()
 		count = *pBuf++;
 	
 		while (count--)
-			outp(SNReg, *pBuf++);
+			outp(SNReg[0], *pBuf++);
 
 		// Prefetch next delay
 		currDelay = nextDelay;
@@ -556,38 +576,6 @@ void PlayImmediate(const char* pVGMFile)
 		
 		switch (value)
 		{
-			// SN76489 commands
-			case 0x4F:	// dd : Game Gear PSG stereo, write dd to port 0x06
-				// stereo PSG cmd, ignored
-				fseek(pFile, 1, SEEK_CUR);
-				break;
-			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
-				outp(SNReg, fgetc(pFile));
-				break;
-			case 0x5A:	// aa dd : YM3812, write value dd to register aa
-				outp(0x388, fgetc(pFile));
-				outp(0x389, fgetc(pFile));
-				
-				count++;
-				break;
-			case 0x51:	// aa dd : YM2413, write value dd to register aa
-			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
-			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
-			case 0x54:	// aa dd : YM2151, write value dd to register aa
-			case 0x55:	// aa dd : YM2203, write value dd to register aa
-			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
-			case 0x57:	// aa dd : YM2608 port 1, write value dd to register aa
-			case 0x58:	// aa dd : YM2610 port 0, write value dd to register aa
-			case 0x59:	// aa dd : YM2610 port 1, write value dd to register aa
-			case 0x5B:	// aa dd : YM3526, write value dd to register aa
-			case 0x5C:	// aa dd : Y8950, write value dd to register aa
-			case 0x5D:	// aa dd : YMZ280B, write value dd to register aa
-			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
-			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
-				// Skip
-				fseek(pFile, 2, SEEK_CUR);
-				break;
-
 			case 0x66:
 				// end of VGM data
 				playing = 0;
@@ -679,6 +667,39 @@ void PlayImmediate(const char* pVGMFile)
 				delay = GETDELAY(16);
 				goto endDelay;
 				break;
+
+				// SN76489 commands
+			case 0x4F:	// dd : Game Gear PSG stereo, write dd to port 0x06
+				// stereo PSG cmd, ignored
+				fseek(pFile, 1, SEEK_CUR);
+				break;
+			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
+				outp(SNReg[0], fgetc(pFile));
+				break;
+			case 0x5A:	// aa dd : YM3812, write value dd to register aa
+				outp(0x388, fgetc(pFile));
+				outp(0x389, fgetc(pFile));
+				
+				count++;
+				break;
+			case 0x51:	// aa dd : YM2413, write value dd to register aa
+			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
+			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
+			case 0x54:	// aa dd : YM2151, write value dd to register aa
+			case 0x55:	// aa dd : YM2203, write value dd to register aa
+			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
+			case 0x57:	// aa dd : YM2608 port 1, write value dd to register aa
+			case 0x58:	// aa dd : YM2610 port 0, write value dd to register aa
+			case 0x59:	// aa dd : YM2610 port 1, write value dd to register aa
+			case 0x5B:	// aa dd : YM3526, write value dd to register aa
+			case 0x5C:	// aa dd : Y8950, write value dd to register aa
+			case 0x5D:	// aa dd : YMZ280B, write value dd to register aa
+			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
+			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
+				// Skip
+				fseek(pFile, 2, SEEK_CUR);
+				break;
+
 			default:
 				printf("PlayImmediate(): Invalid: %02X\n", value);
 				break;
@@ -694,11 +715,11 @@ void PlayImmediate(const char* pVGMFile)
 		// So there are exactly 3 OPL2 cycles to every PIT cycle. Translating that is:
 		// 4 PIT cycles for the data delay and 28 PIT cycles for the address delay
 		// That is a total of 32 PIT cycles for every write
-		if (delay < 32)
+		/*if (delay < 32)
 		{
 			printf("Extremely small delay encountered: %lu. Skipping\n", delay);
 			continue;
-		}
+		}*/
 		
 		//printf("Notes: %u, delay: %lu\n",
 		//	count, delay);
@@ -720,17 +741,59 @@ void PlayImmediate(const char* pVGMFile)
 
 void SavePreprocessed(const char* pFileName);
 
+uint8_t commands[NUM_PASSES][NUM_CHIPS][256];
+uint8_t* pCommands[NUM_PASSES][NUM_CHIPS];
+
+void OutputCommands(FILE* pOut)
+{
+	uint16_t count, length, i;
+
+	for (i = 0; i < NUM_PASSES; i++)
+	{
+		if (identifier[i] & SN76489)
+		{
+			length = pCommands[i][I_SN76489] - commands[i][I_SN76489];
+			count = (length - 1);
+
+			if (count > 255)
+				printf("Too many SN76489 commands: %u!\n", count);
+			commands[i][I_SN76489][0] = count;
+			fwrite(commands[i][I_SN76489], length, 1, pOut);
+		}
+				
+		if (identifier[i] & YM3812)
+		{
+			length = pCommands[i][I_YM3812] - commands[i][I_YM3812];
+			count = (length - 1) / 2;
+
+			if (count > 255)
+				printf("Too many YM3812 commands: %u!\n", count);
+			commands[i][I_YM3812][0] = count;
+			fwrite(commands[i][I_YM3812], length, 1, pOut);
+		}
+
+		if (identifier[i] & YMF262)
+		{
+			length = pCommands[i][I_YMF262] - commands[i][I_YMF262];
+			count = (length - 1) / 2;
+
+			if (count > 255)
+				printf("Too many YMF262 commands: %u!\n", count);
+			commands[i][I_YMF262][0] = count;
+			fwrite(commands[i][I_YMF262], length, 1, pOut);
+		}
+	}
+}
+
 void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 {
 	FILE* pFile, *pOut;
 	uint32_t delay;
 	uint16_t srcDelay;
-	uint8_t commands[256];
-	uint8_t* pCommands;
 	VGMHeader header;
 	uint32_t idx;
-	uint16_t count, length;
 	uint16_t firstDelay;
+	uint16_t i, j;
 	
 	pFile = fopen(pVGMFile, "rb");	
 
@@ -775,7 +838,15 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	printf("Start preprocessing VGM\n");
 	
 	pOut = fopen(pOutFile, "wb");
-	pCommands = commands + 1;
+	
+	// Hardcode identifier for now...
+	identifier[0] = YM3812;//YMF262;
+	identifier[1] = 0;//YMF262;
+	
+	// Reset all pointers
+	for (i = 0; i < NUM_PASSES; i++)
+		for (j = 0; j < NUM_CHIPS; j++)
+			pCommands[i][j] = commands[i][j] + 1;
 	
 	while (playing)
 	{
@@ -783,36 +854,6 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 		
 		switch (value)
 		{
-			// SN76489 commands
-			case 0x4F:	// dd : Game Gear PSG stereo, write dd to port 0x06
-				// stereo PSG cmd, ignored
-				fseek(pFile, 1, SEEK_CUR);
-				break;
-			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
-				*pCommands++ = fgetc(pFile);
-				break;
-			case 0x5A:	// aa dd : YM3812, write value dd to register aa
-				*pCommands++ = fgetc(pFile);
-				*pCommands++ = fgetc(pFile);
-				break;
-			case 0x51:	// aa dd : YM2413, write value dd to register aa
-			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
-			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
-			case 0x54:	// aa dd : YM2151, write value dd to register aa
-			case 0x55:	// aa dd : YM2203, write value dd to register aa
-			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
-			case 0x57:	// aa dd : YM2608 port 1, write value dd to register aa
-			case 0x58:	// aa dd : YM2610 port 0, write value dd to register aa
-			case 0x59:	// aa dd : YM2610 port 1, write value dd to register aa
-			case 0x5B:	// aa dd : YM3526, write value dd to register aa
-			case 0x5C:	// aa dd : Y8950, write value dd to register aa
-			case 0x5D:	// aa dd : YMZ280B, write value dd to register aa
-			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
-			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
-				// Skip
-				fseek(pFile, 2, SEEK_CUR);
-				break;
-
 			case 0x66:
 				// end of VGM data
 				playing = 0;
@@ -904,6 +945,75 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 				delay = GETDELAY(16);
 				goto endDelay;
 				break;
+
+				// SN76489 commands
+			case 0x4F:	// dd : Game Gear PSG stereo, write dd to port 0x06
+			case 0x3F: 	// dd : Second Game Gear PSG stereo, write dd to port 0x06
+				// stereo PSG cmd, ignored
+				fseek(pFile, 1, SEEK_CUR);
+				break;
+			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
+				*pCommands[0][I_SN76489]++ = fgetc(pFile);
+				break;
+			case 0x30:	// dd : Second PSG (SN76489/SN76496) write value dd
+				*pCommands[1][I_SN76489]++ = fgetc(pFile);
+				break;
+			case 0x5A:	// aa dd : YM3812, write value dd to register aa
+				*pCommands[0][I_YM3812]++ = fgetc(pFile);
+				*pCommands[0][I_YM3812]++ = fgetc(pFile);
+				break;
+			case 0xAA:	// aa dd : Second YM3812, write value dd to register aa
+				*pCommands[1][I_YM3812]++ = fgetc(pFile);
+				*pCommands[1][I_YM3812]++ = fgetc(pFile);
+				break;
+			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
+				*pCommands[0][I_YMF262]++ = fgetc(pFile);
+				*pCommands[0][I_YMF262]++ = fgetc(pFile);
+				break;
+			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
+				*pCommands[1][I_YMF262]++ = fgetc(pFile);
+				*pCommands[1][I_YMF262]++ = fgetc(pFile);
+				break;
+				
+			case 0xBD:	// aa dd : SAA1099, write value dd to register aa
+				// Second chip is indicated by msb in first byte
+				value = fgetc(pFile);
+				i = (value & 0x80) ? 1 : 0;
+
+				*pCommands[i][I_SAA1099]++ = value;
+				*pCommands[i][I_SAA1099]++ = fgetc(pFile);
+				break;
+			
+			case 0xAE:	// aa dd : Second YMF262 port 0, write value dd to register aa
+			case 0xAF:	// aa dd : Second YMF262 port 1, write value dd to register aa
+			case 0x51:	// aa dd : YM2413, write value dd to register aa
+			case 0xA1:	// aa dd : Second YM2413, write value dd to register aa
+			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
+			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
+			case 0xA2:	// aa dd : Second Second YM2612 port 0, write value dd to register aa
+			case 0xA3:	// aa dd : Second YM2612 port 1, write value dd to register aa
+			case 0x54:	// aa dd : YM2151, write value dd to register aa
+			case 0xA4:	// aa dd : Second YM2151, write value dd to register aa
+			case 0x55:	// aa dd : YM2203, write value dd to register aa
+			case 0xA5:	// aa dd : Second YM2203, write value dd to register aa
+			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
+			case 0x57:	// aa dd : YM2608 port 1, write value dd to register aa
+			case 0xA6:	// aa dd : Second YM2608 port 0, write value dd to register aa
+			case 0xA7:	// aa dd : Second YM2608 port 1, write value dd to register aa
+			case 0x58:	// aa dd : YM2610 port 0, write value dd to register aa
+			case 0x59:	// aa dd : YM2610 port 1, write value dd to register aa
+			case 0xA8:	// aa dd : Second YM2610 port 0, write value dd to register aa
+			case 0xA9:	// aa dd : Second YM2610 port 1, write value dd to register aa
+			case 0x5B:	// aa dd : YM3526, write value dd to register aa
+			case 0xAB:	// aa dd : Second YM3526, write value dd to register aa
+			case 0x5C:	// aa dd : Y8950, write value dd to register aa
+			case 0xAC:	// aa dd : Second Y8950, write value dd to register aa
+			case 0x5D:	// aa dd : YMZ280B, write value dd to register aa
+			case 0xAD:	// aa dd : Second YMZ280B, write value dd to register aa
+				// Skip
+				fseek(pFile, 2, SEEK_CUR);
+				break;
+
 			default:
 				printf("PreProcessVGM(): Invalid: %02X\n", value);
 				break;
@@ -919,21 +1029,15 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 		// So there are exactly 3 OPL2 cycles to every PIT cycle. Translating that is:
 		// 4 PIT cycles for the data delay and 28 PIT cycles for the address delay
 		// That is a total of 32 PIT cycles for every write
-		if (delay < 32)
+		/*if (delay < 32)
 		{
 			printf("Extremely small delay encountered: %lu. Skipping\n", delay);
 			continue;
-		}
+		}*/
 		
 		// Break up into multiple delays with no notes
 		while (delay > 1)
 		{
-			length = pCommands - commands; 
-			count = (length - 1) / 2;
-	
-			//printf("Notes: %u, delay: %lu\n",
-			//	count, delay);
-
 			if (delay >= 65536L)
 			{
 				firstDelay = 0;
@@ -947,16 +1051,15 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 		
 			// First write delay value
 			fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-
+			
 			// Now output commands
-			if (count > 255)
-				printf("Too many commands: %u!\n", count);
-			commands[0] = count;
-			fwrite(commands, length, 1, pOut);
-
-			// Reset command buffer
+			OutputCommands(pOut);
+			
+			// Reset command buffers
 			// (Next delays will get 0 notes exported
-			pCommands = commands + 1;
+			for (i = 0; i < NUM_PASSES; i++)
+				for (j = 0; j < NUM_CHIPS; j++)
+					pCommands[i][j] = commands[i][j] + 1;
 		}
 	}
 	
@@ -967,12 +1070,7 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
 	
 	// Output last set of commands
-	length = pCommands - commands; 
-	count = (length - 1) / 2;
-	if (count > 255)
-		printf("Too many commands: %u!\n", count);
-	commands[0] = count;
-	fwrite(commands, length, 1, pOut);
+	OutputCommands(pOut);
 	
 	// And a final delay of 0, which would get fetched by the last int handler
 	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
@@ -1346,15 +1444,39 @@ void interrupt HandlerC(void)
 {
 	uint8_t count;
 	uint16_t huge* pW;
+	uint16_t i;
 	
 	// Get note data
-	count = *pBuf++;
-	
-	while (count--)
+	for (i = 0; i < NUM_PASSES; i++)
 	{
-		//outp(SNReg, *pBuf++);
-		outp(0x388, *pBuf++);
-		outp(0x389, *pBuf++);
+		if (identifier[i] & SN76489)
+		{
+			count = *pBuf++;
+			while (count--)
+				outp(SNReg[i], *pBuf++);
+		}
+		
+		if (identifier[i] & YM3812)
+		{
+			count = *pBuf++;
+	
+			while (count--)
+			{
+				outp(OPL2Reg[i], *pBuf++);
+				outp(OPL2Reg[i]+1, *pBuf++);
+			}
+		}
+		
+		if (identifier[i] & YMF262)
+		{
+			count = *pBuf++;
+			
+			while (count--)
+			{
+				outp(OPL3Reg[i], *pBuf++);
+				outp(OPL3Reg[i]+1, *pBuf++);
+			}
+		}
 	}
 
 	// Get delay value from stream
@@ -1563,9 +1685,9 @@ int main(int argc, char* argv[])
 	
 	// Parse port
 	if (argc > 2)
-		sscanf(argv[2], "%X", &SNReg);
+		sscanf(argv[2], "%X", &SNReg[0]);
 
-	printf("Using SN76489 at port %Xh\n", SNReg);
+	printf("Using SN76489 at port %Xh\n", SNReg[0]);
 	
 	InitPCjrAudio();
 	//SetPCjrAudio(1,440,15);
