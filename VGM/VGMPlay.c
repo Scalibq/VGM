@@ -57,13 +57,15 @@ typedef struct
 
 // Flags for the different sound chips we support
 #define SN76489 (1 << I_SN76489)
-#define SAA1099 1 << I_SAA1099)
+#define SAA1099 (1 << I_SAA1099)
 #define AY8930 (1 << I_AY8930)
 #define YM3812 (1 << I_YM3812)
 #define YMF262 (1 << I_YMF262)
 
 uint8_t identifier[NUM_PASSES];
 uint16_t SNReg[NUM_PASSES] = { 0xC0, 0xC0 };
+uint16_t SAAReg[NUM_PASSES] = { 0, 0 };
+uint16_t AYReg[NUM_PASSES] = { 0, 0 };
 uint16_t OPL2Reg[NUM_PASSES] = { 0x388, 0x388 };
 uint16_t OPL3Reg[NUM_PASSES] = { 0x220, 0x222 };
 
@@ -511,7 +513,6 @@ void PlayImmediate(const char* pVGMFile)
 	VGMHeader header;
 	uint32_t idx;
 	uint32_t currentTime;
-	uint16_t count;
 	
 	pFile = fopen(pVGMFile, "rb");	
 
@@ -568,8 +569,6 @@ void PlayImmediate(const char* pVGMFile)
 	// Count down from maximum
 	currentTime |= 0xFFFF0000l;
 	
-	count = 0;
-
 	while (playing)
 	{
 		uint8_t value = fgetc(pFile);
@@ -677,10 +676,16 @@ void PlayImmediate(const char* pVGMFile)
 				outp(SNReg[0], fgetc(pFile));
 				break;
 			case 0x5A:	// aa dd : YM3812, write value dd to register aa
-				outp(0x388, fgetc(pFile));
-				outp(0x389, fgetc(pFile));
-				
-				count++;
+				outp(OPL2Reg[0], fgetc(pFile));
+				outp(OPL2Reg[0]+1, fgetc(pFile));
+				break;
+			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
+				outp(OPL3Reg[0], fgetc(pFile));
+				outp(OPL3Reg[0]+1, fgetc(pFile));
+				break;
+			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
+				outp(OPL3Reg[1], fgetc(pFile));
+				outp(OPL3Reg[1]+1, fgetc(pFile));
 				break;
 			case 0x51:	// aa dd : YM2413, write value dd to register aa
 			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
@@ -694,8 +699,6 @@ void PlayImmediate(const char* pVGMFile)
 			case 0x5B:	// aa dd : YM3526, write value dd to register aa
 			case 0x5C:	// aa dd : Y8950, write value dd to register aa
 			case 0x5D:	// aa dd : YMZ280B, write value dd to register aa
-			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
-			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
 				// Skip
 				fseek(pFile, 2, SEEK_CUR);
 				break;
@@ -721,11 +724,6 @@ void PlayImmediate(const char* pVGMFile)
 			continue;
 		}*/
 		
-		//printf("Notes: %u, delay: %lu\n",
-		//	count, delay);
-		
-		count = 0;
-
 		// Perform delay
 		tickWaitC(delay, &currentTime);
 	}
@@ -760,7 +758,17 @@ void OutputCommands(FILE* pOut)
 			commands[i][I_SN76489][0] = count;
 			fwrite(commands[i][I_SN76489], length, 1, pOut);
 		}
+		
+		if (identifier[i] & SAA1099)
+		{
+			// TODO
+		}
 				
+		if (identifier[i] & AY8930)
+		{
+			// TODO
+		}
+
 		if (identifier[i] & YM3812)
 		{
 			length = pCommands[i][I_YM3812] - commands[i][I_YM3812];
@@ -840,7 +848,7 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	pOut = fopen(pOutFile, "wb");
 	
 	// Hardcode identifier for now...
-	identifier[0] = YM3812;//YMF262;
+	identifier[0] = SN76489;//YM3812;//YMF262;
 	identifier[1] = 0;//YMF262;
 	
 	// Reset all pointers
@@ -1454,6 +1462,16 @@ void interrupt HandlerC(void)
 			count = *pBuf++;
 			while (count--)
 				outp(SNReg[i], *pBuf++);
+		}
+		
+		if (identifier[i] & SAA1099)
+		{
+			// TODO
+		}
+				
+		if (identifier[i] & AY8930)
+		{
+			// TODO
 		}
 		
 		if (identifier[i] & YM3812)
