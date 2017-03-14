@@ -1701,6 +1701,8 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 	
+	fclose(pFile);
+	
 	// Parse port
 	if (argc > 2)
 		sscanf(argv[2], "%X", &SNReg[0]);
