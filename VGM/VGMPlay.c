@@ -52,25 +52,21 @@ typedef struct
 #define YM3812 3
 #define YMF262PORT0 4
 #define YMF262PORT1 5
+#define MIDI 6
 
-#define NUM_CHIPS 6
-#define NUM_PASSES 2
+#define NUM_CHIPS 7
+#define MAX_MULTICHIP 2
 
-uint16_t SNReg[NUM_PASSES] = { 0xC0, 0xC0 };
-uint16_t SAAReg[NUM_PASSES] = { 0, 0 };
-uint16_t AYReg[NUM_PASSES] = { 0, 0 };
-uint16_t OPL2Reg[NUM_PASSES] = { 0x388, 0x388 };
-uint16_t OPL3Reg[NUM_PASSES*2] = { 0x220, 0x222 };
-
-uint8_t nrOfSN76489 = 0;
-uint8_t nrOfSAA1099 = 0;
-uint8_t nrOfAY8930 = 0;
-uint8_t nrOfYM3812 = 0;
-uint8_t nrOfYMF262 = 0;
+uint16_t SNReg[MAX_MULTICHIP] = { 0xC0, 0xC0 };
+uint16_t SAAReg[MAX_MULTICHIP] = { 0, 0 };
+uint16_t AYReg[MAX_MULTICHIP] = { 0, 0 };
+uint16_t OPL2Reg[MAX_MULTICHIP] = { 0x388, 0x388 };
+uint16_t OPL3Reg[MAX_MULTICHIP*2] = { 0x220, 0x222, 0x220, 0x222 };	// Special case: there are two separate ports for the chip
+uint16_t MPUReg[MAX_MULTICHIP] = { 0x330 };
 
 typedef struct _PreHeader
 {
-	char marker[4];				// = {'P','r',e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
+	char marker[4];				// = {'P','r','e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
 	uint32_t headerLen;			// = sizeof(_PreHeader); // Good MS-custom: always store the size of the header in your file, so you can add extra fields to the end later
 	uint8_t version;			// Including a version number may be a good idea
 	uint8_t nrOfSN76489;
@@ -78,7 +74,19 @@ typedef struct _PreHeader
 	uint8_t nrOfAY8930;
 	uint8_t nrOfYM3812;
 	uint8_t nrOfYMF262;
+	uint8_t nrOfMIDI;
 } PreHeader;
+
+PreHeader preHeader = {
+	{'P','r','e','V'},
+	0x01,
+	0,	// nrOfSN76489;
+	0,	// nrOfSAA1099;
+	0,	// nrOfAY8930;
+	0,	// nrOfYM3812;
+	0,	// nrOfYMF262;
+	0,	// nrOfMIDI;
+};
 
 void SetTimerCount(uint16_t rate);
 
@@ -750,14 +758,14 @@ void PlayImmediate(const char* pVGMFile)
 
 void SavePreprocessed(const char* pFileName);
 
-uint8_t commands[NUM_PASSES][NUM_CHIPS][256];
-uint8_t* pCommands[NUM_PASSES][NUM_CHIPS];
+uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][256];
+uint8_t* pCommands[MAX_MULTICHIP][NUM_CHIPS];
 
 void OutputCommands(FILE* pOut)
 {
 	uint16_t count, length, i;
 
-	for (i = 0; i < nrOfSN76489; i++)
+	for (i = 0; i < preHeader.nrOfSN76489; i++)
 	{
 		length = pCommands[i][SN76489] - commands[i][SN76489];
 		count = (length - 1);
@@ -768,17 +776,17 @@ void OutputCommands(FILE* pOut)
 		fwrite(commands[i][SN76489], length, 1, pOut);
 	}
 		
-	for (i = 0; i < nrOfSAA1099; i++)
+	for (i = 0; i < preHeader.nrOfSAA1099; i++)
 	{
 		// TODO
 	}
 				
-	for (i = 0; i < nrOfAY8930; i++)
+	for (i = 0; i < preHeader.nrOfAY8930; i++)
 	{
 		// TODO
 	}
 
-	for (i = 0; i < nrOfYM3812; i++)
+	for (i = 0; i < preHeader.nrOfYM3812; i++)
 	{
 		length = pCommands[i][YM3812] - commands[i][YM3812];
 		count = (length - 1) / 2;
@@ -789,7 +797,7 @@ void OutputCommands(FILE* pOut)
 		fwrite(commands[i][YM3812], length, 1, pOut);
 	}
 
-	for (i = 0; i < nrOfYMF262; i++)
+	for (i = 0; i < preHeader.nrOfYMF262; i++)
 	{
 		// Port 0 first
 		length = pCommands[i][YMF262PORT0] - commands[i][YMF262PORT0];
@@ -866,10 +874,10 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	pOut = fopen(pOutFile, "wb");
 	
 	// Hardcode identifier for now...
-	nrOfSN76489 = 1;//YM3812;//YMF262;
+	preHeader.nrOfSN76489 = 1;//YM3812;//YMF262;
 	
 	// Reset all pointers
-	for (i = 0; i < NUM_PASSES; i++)
+	for (i = 0; i < MAX_MULTICHIP; i++)
 		for (j = 0; j < NUM_CHIPS; j++)
 			pCommands[i][j] = commands[i][j] + 1;
 	
@@ -1082,7 +1090,7 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 			
 			// Reset command buffers
 			// (Next delays will get 0 notes exported
-			for (i = 0; i < NUM_PASSES; i++)
+			for (i = 0; i < MAX_MULTICHIP; i++)
 				for (j = 0; j < NUM_CHIPS; j++)
 					pCommands[i][j] = commands[i][j] + 1;
 		}
@@ -1472,24 +1480,24 @@ void interrupt HandlerC(void)
 	uint16_t i;
 	
 	// Get note data
-	for (i = 0; i < nrOfSN76489; i++)
+	for (i = 0; i < preHeader.nrOfSN76489; i++)
 	{
 		count = *pBuf++;
 		while (count--)
 			outp(SNReg[i], *pBuf++);
 	}
 		
-	for (i = 0; i < nrOfSAA1099; i++)
+	for (i = 0; i < preHeader.nrOfSAA1099; i++)
 	{
 		// TODO
 	}
 				
-	for (i = 0; i < nrOfAY8930; i++)
+	for (i = 0; i < preHeader.nrOfAY8930; i++)
 	{
 		// TODO
 	}
 		
-	for (i = 0; i < nrOfYM3812; i++)
+	for (i = 0; i < preHeader.nrOfYM3812; i++)
 	{
 		count = *pBuf++;
 	
@@ -1500,7 +1508,7 @@ void interrupt HandlerC(void)
 		}
 	}
 		
-	for (i = 0; i < nrOfYMF262; i++)
+	for (i = 0; i < preHeader.nrOfYMF262; i++)
 	{
 		// First port 0
 		count = *pBuf++;
