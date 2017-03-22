@@ -46,28 +46,39 @@ typedef struct
 //#define GETDELAY(n)	((uint32_t)(((n*(1193182.0/44100.0))+0.5)))
 
 // Index for each sound chip in a command stream
-#define I_SN76489 0
-#define I_SAA1099 1
-#define I_AY8930 2
-#define I_YM3812 3
-#define I_YMF262 4
+#define SN76489 0
+#define SAA1099 1
+#define AY8930 2
+#define YM3812 3
+#define YMF262PORT0 4
+#define YMF262PORT1 5
 
-#define NUM_CHIPS 5
+#define NUM_CHIPS 6
 #define NUM_PASSES 2
 
-// Flags for the different sound chips we support
-#define SN76489 (1 << I_SN76489)
-#define SAA1099 (1 << I_SAA1099)
-#define AY8930 (1 << I_AY8930)
-#define YM3812 (1 << I_YM3812)
-#define YMF262 (1 << I_YMF262)
-
-uint8_t identifier[NUM_PASSES];
 uint16_t SNReg[NUM_PASSES] = { 0xC0, 0xC0 };
 uint16_t SAAReg[NUM_PASSES] = { 0, 0 };
 uint16_t AYReg[NUM_PASSES] = { 0, 0 };
 uint16_t OPL2Reg[NUM_PASSES] = { 0x388, 0x388 };
-uint16_t OPL3Reg[NUM_PASSES] = { 0x220, 0x222 };
+uint16_t OPL3Reg[NUM_PASSES*2] = { 0x220, 0x222 };
+
+uint8_t nrOfSN76489 = 0;
+uint8_t nrOfSAA1099 = 0;
+uint8_t nrOfAY8930 = 0;
+uint8_t nrOfYM3812 = 0;
+uint8_t nrOfYMF262 = 0;
+
+typedef struct _PreHeader
+{
+	char marker[4];				// = {'P','r',e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
+	uint32_t headerLen;			// = sizeof(_PreHeader); // Good MS-custom: always store the size of the header in your file, so you can add extra fields to the end later
+	uint8_t version;			// Including a version number may be a good idea
+	uint8_t nrOfSN76489;
+	uint8_t nrOfSAA1099;
+	uint8_t nrOfAY8930;
+	uint8_t nrOfYM3812;
+	uint8_t nrOfYMF262;
+} PreHeader;
 
 void SetTimerCount(uint16_t rate);
 
@@ -746,50 +757,57 @@ void OutputCommands(FILE* pOut)
 {
 	uint16_t count, length, i;
 
-	for (i = 0; i < NUM_PASSES; i++)
+	for (i = 0; i < nrOfSN76489; i++)
 	{
-		if (identifier[i] & SN76489)
-		{
-			length = pCommands[i][I_SN76489] - commands[i][I_SN76489];
-			count = (length - 1);
+		length = pCommands[i][SN76489] - commands[i][SN76489];
+		count = (length - 1);
 
-			if (count > 255)
-				printf("Too many SN76489 commands: %u!\n", count);
-			commands[i][I_SN76489][0] = count;
-			fwrite(commands[i][I_SN76489], length, 1, pOut);
-		}
+		if (count > 255)
+			printf("Too many SN76489 commands: %u!\n", count);
+		commands[i][SN76489][0] = count;
+		fwrite(commands[i][SN76489], length, 1, pOut);
+	}
 		
-		if (identifier[i] & SAA1099)
-		{
-			// TODO
-		}
+	for (i = 0; i < nrOfSAA1099; i++)
+	{
+		// TODO
+	}
 				
-		if (identifier[i] & AY8930)
-		{
-			// TODO
-		}
+	for (i = 0; i < nrOfAY8930; i++)
+	{
+		// TODO
+	}
 
-		if (identifier[i] & YM3812)
-		{
-			length = pCommands[i][I_YM3812] - commands[i][I_YM3812];
-			count = (length - 1) / 2;
+	for (i = 0; i < nrOfYM3812; i++)
+	{
+		length = pCommands[i][YM3812] - commands[i][YM3812];
+		count = (length - 1) / 2;
 
-			if (count > 255)
-				printf("Too many YM3812 commands: %u!\n", count);
-			commands[i][I_YM3812][0] = count;
-			fwrite(commands[i][I_YM3812], length, 1, pOut);
-		}
+		if (count > 255)
+			printf("Too many YM3812 commands: %u!\n", count);
+		commands[i][YM3812][0] = count;
+		fwrite(commands[i][YM3812], length, 1, pOut);
+	}
 
-		if (identifier[i] & YMF262)
-		{
-			length = pCommands[i][I_YMF262] - commands[i][I_YMF262];
-			count = (length - 1) / 2;
+	for (i = 0; i < nrOfYMF262; i++)
+	{
+		// Port 0 first
+		length = pCommands[i][YMF262PORT0] - commands[i][YMF262PORT0];
+		count = (length - 1) / 2;
 
-			if (count > 255)
-				printf("Too many YMF262 commands: %u!\n", count);
-			commands[i][I_YMF262][0] = count;
-			fwrite(commands[i][I_YMF262], length, 1, pOut);
-		}
+		if (count > 255)
+			printf("Too many YMF262 port 0 commands: %u!\n", count);
+		commands[i][YMF262PORT0][0] = count;
+		fwrite(commands[i][YMF262PORT0], length, 1, pOut);
+
+		// Port 1 second
+		length = pCommands[i][YMF262PORT1] - commands[i][YMF262PORT1];
+		count = (length - 1) / 2;
+
+		if (count > 255)
+			printf("Too many YMF262 port 1 commands: %u!\n", count);
+		commands[i][YMF262PORT1][0] = count;
+		fwrite(commands[i][YMF262PORT1], length, 1, pOut);
 	}
 }
 
@@ -848,8 +866,7 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	pOut = fopen(pOutFile, "wb");
 	
 	// Hardcode identifier for now...
-	identifier[0] = SN76489;//YM3812;//YMF262;
-	identifier[1] = 0;//YMF262;
+	nrOfSN76489 = 1;//YM3812;//YMF262;
 	
 	// Reset all pointers
 	for (i = 0; i < NUM_PASSES; i++)
@@ -961,26 +978,26 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 				fseek(pFile, 1, SEEK_CUR);
 				break;
 			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
-				*pCommands[0][I_SN76489]++ = fgetc(pFile);
+				*pCommands[0][SN76489]++ = fgetc(pFile);
 				break;
 			case 0x30:	// dd : Second PSG (SN76489/SN76496) write value dd
-				*pCommands[1][I_SN76489]++ = fgetc(pFile);
+				*pCommands[1][SN76489]++ = fgetc(pFile);
 				break;
 			case 0x5A:	// aa dd : YM3812, write value dd to register aa
-				*pCommands[0][I_YM3812]++ = fgetc(pFile);
-				*pCommands[0][I_YM3812]++ = fgetc(pFile);
+				*pCommands[0][YM3812]++ = fgetc(pFile);
+				*pCommands[0][YM3812]++ = fgetc(pFile);
 				break;
 			case 0xAA:	// aa dd : Second YM3812, write value dd to register aa
-				*pCommands[1][I_YM3812]++ = fgetc(pFile);
-				*pCommands[1][I_YM3812]++ = fgetc(pFile);
+				*pCommands[1][YM3812]++ = fgetc(pFile);
+				*pCommands[1][YM3812]++ = fgetc(pFile);
 				break;
 			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
-				*pCommands[0][I_YMF262]++ = fgetc(pFile);
-				*pCommands[0][I_YMF262]++ = fgetc(pFile);
+				*pCommands[0][YMF262PORT0]++ = fgetc(pFile);
+				*pCommands[0][YMF262PORT0]++ = fgetc(pFile);
 				break;
 			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
-				*pCommands[1][I_YMF262]++ = fgetc(pFile);
-				*pCommands[1][I_YMF262]++ = fgetc(pFile);
+				*pCommands[0][YMF262PORT1]++ = fgetc(pFile);
+				*pCommands[0][YMF262PORT1]++ = fgetc(pFile);
 				break;
 				
 			case 0xBD:	// aa dd : SAA1099, write value dd to register aa
@@ -988,8 +1005,8 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 				value = fgetc(pFile);
 				i = (value & 0x80) ? 1 : 0;
 
-				*pCommands[i][I_SAA1099]++ = value;
-				*pCommands[i][I_SAA1099]++ = fgetc(pFile);
+				*pCommands[i][SAA1099]++ = value;
+				*pCommands[i][SAA1099]++ = fgetc(pFile);
 				break;
 			
 			case 0xAE:	// aa dd : Second YMF262 port 0, write value dd to register aa
@@ -1455,45 +1472,52 @@ void interrupt HandlerC(void)
 	uint16_t i;
 	
 	// Get note data
-	for (i = 0; i < NUM_PASSES; i++)
+	for (i = 0; i < nrOfSN76489; i++)
 	{
-		if (identifier[i] & SN76489)
-		{
-			count = *pBuf++;
-			while (count--)
-				outp(SNReg[i], *pBuf++);
-		}
+		count = *pBuf++;
+		while (count--)
+			outp(SNReg[i], *pBuf++);
+	}
 		
-		if (identifier[i] & SAA1099)
-		{
-			// TODO
-		}
+	for (i = 0; i < nrOfSAA1099; i++)
+	{
+		// TODO
+	}
 				
-		if (identifier[i] & AY8930)
-		{
-			// TODO
-		}
+	for (i = 0; i < nrOfAY8930; i++)
+	{
+		// TODO
+	}
 		
-		if (identifier[i] & YM3812)
-		{
-			count = *pBuf++;
+	for (i = 0; i < nrOfYM3812; i++)
+	{
+		count = *pBuf++;
 	
-			while (count--)
-			{
-				outp(OPL2Reg[i], *pBuf++);
-				outp(OPL2Reg[i]+1, *pBuf++);
-			}
-		}
-		
-		if (identifier[i] & YMF262)
+		while (count--)
 		{
-			count = *pBuf++;
+			outp(OPL2Reg[i], *pBuf++);
+			outp(OPL2Reg[i]+1, *pBuf++);
+		}
+	}
+		
+	for (i = 0; i < nrOfYMF262; i++)
+	{
+		// First port 0
+		count = *pBuf++;
 			
-			while (count--)
-			{
-				outp(OPL3Reg[i], *pBuf++);
-				outp(OPL3Reg[i]+1, *pBuf++);
-			}
+		while (count--)
+		{
+			outp(OPL3Reg[i*2], *pBuf++);
+			outp(OPL3Reg[i*2]+1, *pBuf++);
+		}
+
+		// Second port 1
+		count = *pBuf++;
+			
+		while (count--)
+		{
+			outp(OPL3Reg[i*2 + 1], *pBuf++);
+			outp(OPL3Reg[i*2 + 1]+1, *pBuf++);
 		}
 	}
 
