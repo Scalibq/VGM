@@ -8,6 +8,7 @@
 #include <string.h>
 #include "8253.h"
 #include "8259A.h"
+#include "MIDI.h"
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -68,6 +69,7 @@ typedef struct _PreHeader
 {
 	char marker[4];				// = {'P','r','e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
 	uint32_t headerLen;			// = sizeof(_PreHeader); // Good MS-custom: always store the size of the header in your file, so you can add extra fields to the end later
+	uint32_t size;				// Amount of data after header
 	uint8_t version;			// Including a version number may be a good idea
 	uint8_t nrOfSN76489;
 	uint8_t nrOfSAA1099;
@@ -79,6 +81,7 @@ typedef struct _PreHeader
 
 PreHeader preHeader = {
 	{'P','r','e','V'},
+	sizeof(PreHeader),
 	0x01,
 	0,	// nrOfSN76489;
 	0,	// nrOfSAA1099;
@@ -819,17 +822,53 @@ void OutputCommands(FILE* pOut)
 	}
 }
 
-void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
+typedef enum
 {
-	FILE* pFile, *pOut;
+	FT_Unknown,
+	FT_VGMFile,
+	FT_MIDIFile,
+	FT_PreFile
+} FileType;
+
+FileType GetFileType(FILE* pFile)
+{
+	VGMHeader* pVGMHeader;
+	PreHeader* pPreHeader;
+	MIDIHeader* pMIDIHeader;
+	
+	uint8_t data[16];
+	
+	// Grab enough data to detect the supported types
+	fread(data, sizeof(data), 1, pFile);
+	fseek(pFile, 0, SEEK_SET);
+	
+	// Try VGM
+	pVGMHeader = (VGMHeader*)data;
+	if (pVGMHeader->VGMIdent == VFileIdent)
+		return FT_VGMFile;
+	
+	// Try MIDI
+	pMIDIHeader = (MIDIHeader*)data;
+	if (memcmp(pMIDIHeader->chunk.chunkType, "MThd", 4) == 0)
+		return FT_MIDIFile;
+	
+	// Try Pre
+	pPreHeader = (PreHeader*)data;
+	if (memcmp(pPreHeader->marker, "PreV", 4) == 0)
+		return FT_PreFile;
+	
+	return FT_Unknown;
+}
+
+void PreProcessVGM(FILE* pFile, const char* pOutFile)
+{
+	FILE* pOut;
 	uint32_t delay;
 	uint16_t srcDelay;
 	VGMHeader header;
-	uint32_t idx;
+	uint32_t idx, size;
 	uint16_t firstDelay;
 	uint16_t i, j;
-	
-	pFile = fopen(pVGMFile, "rb");	
 
 	fread(&header, sizeof(header), 1, pFile);
 	
@@ -841,7 +880,7 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 		return;
 	}
 	
-	printf("%s details:\n", pVGMFile);
+	printf("VGM file details:\n");
 	printf("EoF Offset: %08X\n", header.EOFoffset);
 	printf("Version: %08X\n", header.Version);
 	printf("GD3 Offset: %08X\n", header.GD3offset);
@@ -875,6 +914,9 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	
 	// Hardcode identifier for now...
 	preHeader.nrOfSN76489 = 1;//YM3812;//YMF262;
+	
+	// Save header
+	_farfwrite(&preHeader, sizeof(preHeader), 1, pOut);
 	
 	// Reset all pointers
 	for (i = 0; i < MAX_MULTICHIP; i++)
@@ -1107,8 +1149,13 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 	
 	// And a final delay of 0, which would get fetched by the last int handler
 	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+	
+	// Update size field
+	size = ftell(pOut);
+	size -= sizeof(preHeader);
+	fseek(pOut, 8, SEEK_SET);
+	fwrite(&size, sizeof(size), 1, pOut);
 
-	fclose(pFile);
 	fclose(pOut);
 	
 	printf("Done preprocessing VGM\n");
@@ -1117,35 +1164,32 @@ void PreProcessVGM(const char* pVGMFile, const char* pOutFile)
 void SavePreprocessed(const char* pFileName)
 {
 	FILE* pFile = fopen(pFileName, "wb");
-	uint32_t size;
+
+	preHeader.size = ((uint32_t)pEndBuf-(uint32_t)pPreprocessed);
 	
-	size = ((uint32_t)pEndBuf-(uint32_t)pPreprocessed);
-	
-	printf("Preprocessed size: %lu\n", size);
+	printf("Preprocessed size: %lu\n", preHeader.size);
 	
 	// Save to file
-	_farfwrite(pPreprocessed, size, 1, pFile);
+	_farfwrite(&preHeader, sizeof(preHeader), 1, pFile);	
+	_farfwrite(pPreprocessed, preHeader.size, 1, pFile);
 	fclose(pFile);
 }
 
 void LoadPreprocessed(const char* pFileName)
 {
 	FILE* pFile = fopen(pFileName, "rb");
-	uint32_t size;
-
-	fseek(pFile, 0, SEEK_END);
-	size = ftell(pFile);
-	fseek(pFile, 0, SEEK_SET);
-	
-	pPreprocessed = farmalloc(size);
-	
-	printf("Preprocessed size: %lu\n", size);
 	
 	// Load from file
-	_farfread(pPreprocessed, size, 1, pFile);
+	_farfread(&preHeader, sizeof(preHeader), 1, pFile);
+	
+	pPreprocessed = farmalloc(preHeader.size);
+	
+	printf("Preprocessed size: %lu\n", preHeader.size);
+
+	_farfread(pPreprocessed, preHeader.size, 1, pFile);
 	fclose(pFile);
 
-	pEndBuf = pPreprocessed + size;
+	pEndBuf = pPreprocessed + preHeader.size;
 	
 	// Set playing position to start of buffer
 	pBuf = pPreprocessed;
@@ -1596,9 +1640,34 @@ MachineType machineType;
 
 void PlayPoll1(const char* pVGMFile)
 {
-	PreProcessVGM(pVGMFile, "out.pre");
-	LoadPreprocessed("out.pre");
+	FILE* pFile;
+	FileType fileType;
 	
+	pFile = fopen(pVGMFile, "rb");
+	
+	fileType = GetFileType(pFile);
+	
+	switch (fileType)
+	{
+		case FT_VGMFile:
+			PreProcessVGM(pFile, "out.pre");
+			fclose(pFile);
+			LoadPreprocessed("out.pre");
+			break;
+		case FT_MIDIFile:
+			// TODO
+			fclose(pFile);
+			break;
+		case FT_PreFile:
+			fclose(pFile);
+			LoadPreprocessed(pVGMFile);
+			break;
+		default:
+			fclose(pFile);
+			printf("Unsupported file!\n");
+			break;
+	}
+		
 	// Set to rate generator
 	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	SetTimerCount(0);
@@ -1613,8 +1682,33 @@ void PlayPoll1(const char* pVGMFile)
 
 void PlayPoll2(const char* pVGMFile)
 {
-	PreProcessVGM(pVGMFile, "out.pre");
-	LoadPreprocessed("out.pre");
+	FILE* pFile;
+	FileType fileType;
+	
+	pFile = fopen(pVGMFile, "rb");
+	
+	fileType = GetFileType(pFile);
+	
+	switch (fileType)
+	{
+		case FT_VGMFile:
+			PreProcessVGM(pFile, "out.pre");
+			fclose(pFile);
+			LoadPreprocessed("out.pre");
+			break;
+		case FT_MIDIFile:
+			// TODO
+			fclose(pFile);
+			break;
+		case FT_PreFile:
+			fclose(pFile);
+			LoadPreprocessed(pVGMFile);
+			break;
+		default:
+			fclose(pFile);
+			printf("Unsupported file!\n");
+			break;
+	}
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
@@ -1636,8 +1730,33 @@ void PlayPoll2(const char* pVGMFile)
 
 void PlayPoll3(const char* pVGMFile)
 {
-	PreProcessVGM(pVGMFile, "out.pre");
-	LoadPreprocessed("out.pre");
+	FILE* pFile;
+	FileType fileType;
+	
+	pFile = fopen(pVGMFile, "rb");	
+
+	fileType = GetFileType(pFile);
+	
+	switch (fileType)
+	{
+		case FT_VGMFile:
+			PreProcessVGM(pFile, "out.pre");
+			fclose(pFile);
+			LoadPreprocessed("out.pre");
+			break;
+		case FT_MIDIFile:
+			// TODO
+			fclose(pFile);
+			break;
+		case FT_PreFile:
+			fclose(pFile);
+			LoadPreprocessed(pVGMFile);
+			break;
+		default:
+			fclose(pFile);
+			printf("Unsupported file!\n");
+			break;
+	}
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
@@ -1659,12 +1778,36 @@ void PlayPoll3(const char* pVGMFile)
 	
 void PlayInt(const char* pVGMFile)
 {
+	FILE* pFile;
+	FileType fileType;
 	uint8_t mask;
 	uint16_t far* pW;
 	
 	// Int-based replay
-	PreProcessVGM(pVGMFile, "out.pre");
-	LoadPreprocessed("out.pre");
+	pFile = fopen(pVGMFile, "rb");	
+
+	fileType = GetFileType(pFile);
+	
+	switch (fileType)
+	{
+		case FT_VGMFile:
+			PreProcessVGM(pFile, "out.pre");
+			fclose(pFile);
+			LoadPreprocessed("out.pre");
+			break;
+		case FT_MIDIFile:
+			// TODO
+			fclose(pFile);
+			break;
+		case FT_PreFile:
+			fclose(pFile);
+			LoadPreprocessed(pVGMFile);
+			break;
+		default:
+			fclose(pFile);
+			printf("Unsupported file!\n");
+			break;
+	}
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
