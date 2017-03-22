@@ -913,11 +913,11 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	pOut = fopen(pOutFile, "wb");
 	
 	// Detect used chips
-	preHeader.nrOfSN76489 = (header.SN76489clock != 0) + ((header.SN76489clock & 0x80000000l) != 0);
-	//preHeader.nrOfSAA1099 = (header.SAA1099clock != 0) + ((header.SAA1099clock & 0x80000000l) != 0);
-	//preHeader.nrOfAY8930 = (header.AY8930clock != 0) + ((header.AY8930clock & 0x80000000l) != 0);
-	preHeader.nrOfYM3812 = (header.YM3812clock != 0) + ((header.YM3812clock & 0x80000000l) != 0);
-	preHeader.nrOfYMF262 = (header.YMF262clock != 0) + ((header.YMF262clock & 0x80000000l) != 0);
+	preHeader.nrOfSN76489 = (header.SN76489clock != 0) + ((header.SN76489clock & 0x40000000L) != 0);
+	//preHeader.nrOfSAA1099 = (header.SAA1099clock != 0) + ((header.SAA1099clock & 0x40000000L) != 0);
+	//preHeader.nrOfAY8930 = (header.AY8930clock != 0) + ((header.AY8930clock & 0x40000000L) != 0);
+	preHeader.nrOfYM3812 = (header.YM3812clock != 0) + ((header.YM3812clock & 0x40000000L) != 0);
+	preHeader.nrOfYMF262 = (header.YMF262clock != 0) + ((header.YMF262clock & 0x40000000L) != 0);
 	preHeader.nrOfMIDI = 0;
 	
 	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
