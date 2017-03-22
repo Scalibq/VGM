@@ -31,7 +31,7 @@ typedef struct
 	uint32_t OKIM6258clock;
 	uint8_t _OF, _KF, _CF, reserved2;
 	uint32_t OKIM6295clock, K051649clock, K054539clock, HuC6280clock, C140clock;
-	uint32_t K053260clock, Pokeyclock, QSoundclock, reserved3, reserved4;
+	uint32_t K053260clock, Pokeyclock, QSoundclock, SCSPclock, extraHdroffset;
 } VGMHeader;
 
 #define VFileIdent 0x206d6756
@@ -912,8 +912,21 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	
 	pOut = fopen(pOutFile, "wb");
 	
-	// Hardcode identifier for now...
-	preHeader.nrOfSN76489 = 1;//YM3812;//YMF262;
+	// Detect used chips
+	preHeader.nrOfSN76489 = (header.SN76489clock != 0) + ((header.SN76489clock & 0x80000000l) != 0);
+	//preHeader.nrOfSAA1099 = (header.SAA1099clock != 0) + ((header.SAA1099clock & 0x80000000l) != 0);
+	//preHeader.nrOfAY8930 = (header.AY8930clock != 0) + ((header.AY8930clock & 0x80000000l) != 0);
+	preHeader.nrOfYM3812 = (header.YM3812clock != 0) + ((header.YM3812clock & 0x80000000l) != 0);
+	preHeader.nrOfYMF262 = (header.YMF262clock != 0) + ((header.YMF262clock & 0x80000000l) != 0);
+	preHeader.nrOfMIDI = 0;
+	
+	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
+	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
+	printf("# AY8930: %u\n", preHeader.nrOfAY8930);
+	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
+	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
+	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
+
 	
 	// Save header
 	_farfwrite(&preHeader, sizeof(preHeader), 1, pOut);
@@ -1185,6 +1198,13 @@ void LoadPreprocessed(const char* pFileName)
 	pPreprocessed = farmalloc(preHeader.size);
 	
 	printf("Preprocessed size: %lu\n", preHeader.size);
+	
+	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
+	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
+	printf("# AY8930: %u\n", preHeader.nrOfAY8930);
+	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
+	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
+	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
 
 	_farfread(pPreprocessed, preHeader.size, 1, pFile);
 	fclose(pFile);
