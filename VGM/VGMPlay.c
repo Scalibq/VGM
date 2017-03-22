@@ -338,6 +338,62 @@ uint8_t huge* pPreprocessed;
 uint8_t huge* pBuf;
 uint8_t huge* pEndBuf;
 
+void PlayData(void)
+{
+	uint8_t count;
+	uint16_t i;
+	
+	// Get note data
+	for (i = 0; i < preHeader.nrOfSN76489; i++)
+	{
+		count = *pBuf++;
+		while (count--)
+			outp(SNReg[i], *pBuf++);
+	}
+		
+	for (i = 0; i < preHeader.nrOfSAA1099; i++)
+	{
+		// TODO
+	}
+				
+	for (i = 0; i < preHeader.nrOfAY8930; i++)
+	{
+		// TODO
+	}
+		
+	for (i = 0; i < preHeader.nrOfYM3812; i++)
+	{
+		count = *pBuf++;
+	
+		while (count--)
+		{
+			outp(OPL2Reg[i], *pBuf++);
+			outp(OPL2Reg[i]+1, *pBuf++);
+		}
+	}
+		
+	for (i = 0; i < preHeader.nrOfYMF262; i++)
+	{
+		// First port 0
+		count = *pBuf++;
+			
+		while (count--)
+		{
+			outp(OPL3Reg[i*2], *pBuf++);
+			outp(OPL3Reg[i*2]+1, *pBuf++);
+		}
+
+		// Second port 1
+		count = *pBuf++;
+			
+		while (count--)
+		{
+			outp(OPL3Reg[i*2 + 1], *pBuf++);
+			outp(OPL3Reg[i*2 + 1]+1, *pBuf++);
+		}
+	}
+}
+
 void PlayBuffer2()
 {
 	uint16_t far* pW;
@@ -459,7 +515,6 @@ void PlayBuffer2()
 void PlayBuffer2C()
 {
 	uint16_t far* pW;
-	uint8_t count;
 	uint32_t currentTime;
 	uint16_t currDelay, nextDelay;
 	uint32_t totalDelay;
@@ -502,15 +557,7 @@ void PlayBuffer2C()
 		else
 			tickWaitC(currDelay, &currentTime);
 
-		// Loop through all command-data
-		count = *pBuf++;
-	
-		while (count--)
-		{
-			//outp(SNReg, *pBuf++);
-			outp(0x388, *pBuf++);
-			outp(0x389, *pBuf++);
-		}
+		PlayData();
 
 		// Prefetch next delay
 		currDelay = nextDelay;
@@ -1539,59 +1586,9 @@ void interrupt (*OldKeyHandler)(void);
 
 void interrupt HandlerC(void)
 {
-	uint8_t count;
 	uint16_t huge* pW;
-	uint16_t i;
 	
-	// Get note data
-	for (i = 0; i < preHeader.nrOfSN76489; i++)
-	{
-		count = *pBuf++;
-		while (count--)
-			outp(SNReg[i], *pBuf++);
-	}
-		
-	for (i = 0; i < preHeader.nrOfSAA1099; i++)
-	{
-		// TODO
-	}
-				
-	for (i = 0; i < preHeader.nrOfAY8930; i++)
-	{
-		// TODO
-	}
-		
-	for (i = 0; i < preHeader.nrOfYM3812; i++)
-	{
-		count = *pBuf++;
-	
-		while (count--)
-		{
-			outp(OPL2Reg[i], *pBuf++);
-			outp(OPL2Reg[i]+1, *pBuf++);
-		}
-	}
-		
-	for (i = 0; i < preHeader.nrOfYMF262; i++)
-	{
-		// First port 0
-		count = *pBuf++;
-			
-		while (count--)
-		{
-			outp(OPL3Reg[i*2], *pBuf++);
-			outp(OPL3Reg[i*2]+1, *pBuf++);
-		}
-
-		// Second port 1
-		count = *pBuf++;
-			
-		while (count--)
-		{
-			outp(OPL3Reg[i*2 + 1], *pBuf++);
-			outp(OPL3Reg[i*2 + 1]+1, *pBuf++);
-		}
-	}
+	PlayData();
 
 	// Get delay value from stream
 	pW = (uint16_t huge*)pBuf;
