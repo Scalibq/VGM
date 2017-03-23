@@ -449,6 +449,15 @@ void PlayData(void)
 			outp(OPL3Reg[i*2 + 1]+1, *pBuf++);
 		}
 	}
+	
+	for (i = 0; i < preHeader.nrOfMIDI; i++)
+	{
+		count = *pBuf++;
+		
+		WriteBuffer(pBuf, count);
+		
+		pBuf += count;
+	}
 }
 
 void PlayBuffer2()
@@ -868,6 +877,17 @@ void SavePreprocessed(const char* pFileName);
 uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][256];
 uint8_t* pCommands[MAX_MULTICHIP][NUM_CHIPS];
 
+void BufferMIDI(uint8_t huge* pBuf, uint16_t len)
+{
+	uint16_t i;
+	
+	for (i = 0; i < len; i++)
+	{
+		*pCommands[0][MIDI]++ = *pBuf++;
+	}
+}
+
+
 void OutputCommands(FILE* pOut)
 {
 	uint16_t count, length, i;
@@ -923,6 +943,17 @@ void OutputCommands(FILE* pOut)
 			printf("Too many YMF262 port 1 commands: %u!\n", count);
 		commands[i][YMF262PORT1][0] = count;
 		fwrite(commands[i][YMF262PORT1], length, 1, pOut);
+	}
+	
+	for (i = 0; i < preHeader.nrOfMIDI; i++)
+	{
+		length = pCommands[i][MIDI] - commands[i][MIDI];
+		count = (length - 1);
+
+		if (count > 255)
+			printf("Too many MIDI commands: %u!\n", count);
+		commands[i][MIDI][0] = count;
+		fwrite(commands[i][MIDI], length, 1, pOut);
 	}
 }
 
@@ -1030,7 +1061,6 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
 	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
 	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
-
 	
 	// Save header
 	_farfwrite(&preHeader, sizeof(preHeader), 1, pOut);
@@ -1426,10 +1456,12 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 {
 	MIDIHeader header;
 	MIDIChunk track;
-	uint32_t currentTime;
 	uint16_t lastLength;
-	uint16_t i;
+	uint16_t i, j;
 	uint8_t huge* pData;
+	uint16_t firstDelay;
+	uint32_t size;
+	FILE* pOut;
 	
 	fread(&header, sizeof(header), 1, pFile);
 	
@@ -1496,7 +1528,26 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	
 	fclose(pFile);
 	
+	// Reset all pointers
+	for (i = 0; i < MAX_MULTICHIP; i++)
+		for (j = 0; j < NUM_CHIPS; j++)
+			pCommands[i][j] = commands[i][j] + 1;
+	
 	printf("Start preprocessing MIDI\n");
+	
+	pOut = fopen(pOutFile, "wb");
+
+	preHeader.nrOfMIDI = 1;
+	
+	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
+	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
+	printf("# AY8930: %u\n", preHeader.nrOfAY8930);
+	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
+	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
+	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
+	
+	// Save header
+	_farfwrite(&preHeader, sizeof(preHeader), 1, pOut);
 
 	// Get the first deltas for each stream
 	for (i = 0; i < nrOfTracks; i++)
@@ -1504,19 +1555,6 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		// Get a delta-time from the stream
 		tracks[i].pCur = ReadVarLen(tracks[i].pCur, &tracks[i].delta);
 	}
-	
-	// Set to rate generator
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
-	SetTimerCount(0);
-	
-	// Get LSB of timer counter
-	currentTime = inp(CHAN0PORT);
-	
-	// Get MSB of timer counter
-	currentTime |= ((uint16_t)inp(CHAN0PORT)) << 8;
-	
-	// Count down from maximum
-	currentTime |= 0xFFFF0000l;
 	
 	while (playing && (tracksStopped < nrOfTracks))
 	{
@@ -1547,10 +1585,35 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		for (i = 0; i < nrOfTracks; i++)
 			tracks[i].delta -= delta;
 		
-		// Perform wait for delta
 		delay = GETMIDIDELAY(delta);
-		tickWaitC(delay, &currentTime);
 		
+		// Break up into multiple delays with no notes
+		while (delay > 1)
+		{
+			if (delay >= 65536L)
+			{
+				firstDelay = 0;
+				delay -= 65536L;
+			}
+			else
+			{
+				firstDelay = delay;
+				delay = 0;
+			}
+		
+			// First write delay value
+			fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+			
+			// Now output commands
+			OutputCommands(pOut);
+			
+			// Reset command buffers
+			// (Next delays will get 0 notes exported
+			for (i = 0; i < MAX_MULTICHIP; i++)
+				for (j = 0; j < NUM_CHIPS; j++)
+					pCommands[i][j] = commands[i][j] + 1;
+		}
+	
 		// Get a MIDI command from the stream
 		value = *pData++;
 		
@@ -1563,7 +1626,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				printf("SysEx F0, length: %lu\n", length);
 				
 				// Pre-pend 0xF0, it is implicit
-				WriteBuffer(pData-1, length+1);
+				BufferMIDI(pData-1, length+1);
 				pData += length;
 				break;
 			// Escaped SysEx
@@ -1572,7 +1635,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				
 				printf("SysEx F7, length: %lu\n", length);
 				
-				WriteBuffer(pData, length);
+				BufferMIDI(pData, length);
 				pData += length;
 				break;
 			// Meta event
@@ -1612,7 +1675,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				}
 					
 				// Send first byte as well
-				WriteBuffer(pData-1, length+1);
+				BufferMIDI(pData-1, length+1);
 				pData += length;
 				break;
 		}
@@ -1623,11 +1686,27 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		else
 			tracks[t].delta = UINT32_MAX;
 	}
-
-	// Reset to square wave
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
-	SetTimerCount(0);
 	
+	// Output last delay of 0
+	firstDelay = 0;
+
+	// Write to disk
+	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+	
+	// Output last set of commands
+	OutputCommands(pOut);
+	
+	// And a final delay of 0, which would get fetched by the last int handler
+	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+	
+	// Update size field
+	size = ftell(pOut);
+	size -= sizeof(preHeader);
+	fseek(pOut, 8, SEEK_SET);
+	fwrite(&size, sizeof(size), 1, pOut);
+
+	fclose(pOut);
+
 	// Free all memory
 	for (i = 0; i < nrOfTracks; i++)
 		farfree(tracks[i].pData);
