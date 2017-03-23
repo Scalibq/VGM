@@ -9,6 +9,8 @@
 #include "8253.h"
 #include "8259A.h"
 #include "MIDI.h"
+#include "MPU401.h"
+#include "Endianness.h"
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -92,6 +94,61 @@ PreHeader preHeader = {
 };
 
 void SetTimerCount(uint16_t rate);
+
+void WriteBuffer(uint8_t huge* pBuf, uint16_t len)
+{
+	uint16_t i;
+	
+	for (i = 0; i < len; i++)
+	{
+		put_mpu_out(0x330, pBuf[i]);
+	}
+}
+
+// Special SysEx message, 'Turn General MIDI System On'
+uint8_t GMReset[] = { 0xF0, 0x7E, 0x7F, 0x09, 0x01, 0xF7 };
+
+void InitMPU401(void)
+{
+	uint8_t c;
+	
+	set_uart(0x330);
+	
+	// For all channels
+	for (c = 0; c < 16; c++)
+	{
+		// Send All Notes Off
+		put_mpu_out(0x330, 0xB0 + c);
+		put_mpu_out(0x330, 123);
+		
+		// Send All Sound Off
+		put_mpu_out(0x330, 0xB0 + c);
+		put_mpu_out(0x330, 120);
+	}
+	
+	WriteBuffer(GMReset, _countof(GMReset));
+}
+
+void CloseMPU401(void)
+{
+	uint8_t c;
+	
+	// For all channels
+	for (c = 0; c < 16; c++)
+	{
+		// Send All Notes Off
+		put_mpu_out(0x330, 0xB0 + c);
+		put_mpu_out(0x330, 123);
+		
+		// Send All Sound Off
+		put_mpu_out(0x330, 0xB0 + c);
+		put_mpu_out(0x330, 120);
+	}
+	
+	WriteBuffer(GMReset, _countof(GMReset));
+	
+	reset_mpu(0x330);
+}
 
 void InitPCjrAudio(void)
 {
@@ -1221,6 +1278,364 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	printf("Done preprocessing VGM\n");
 }
 
+typedef struct
+{
+	uint8_t huge* pData;
+	uint8_t huge* pCur;
+	uint32_t length;
+	uint32_t delta;
+} MIDITrack;
+
+uint8_t nrOfTracks = 0;
+MIDITrack tracks[16];
+uint8_t tracksStopped = 0;
+
+// Speed data
+uint32_t tempo = 500000L;		// Microseconds per MIDI quarter-note, 24-bit value, default is 500000, which is 120 bpm
+uint16_t division = 0;	// Ticks per quarter-note, 16-bit value
+float divisor = 0;		// Precalc this at every tempo-change
+
+// tempo/division = microseconds per MIDI tick
+// 1 microsecond == 1/10000000 second
+
+//#define MICROSEC_PER_TICK (tempo/(float)division)
+//#define DIVISOR	(MICROSEC_PER_TICK*(PITFREQ/1000000.0f))
+//#define GETMIDIDELAY(x) ((uint32_t)((float)x*DIVISOR))
+#define GETMIDIDELAY(x) ((uint32_t)(x*divisor))
+
+// Variable-length integers are maximum 0FFFFFFF, so 28-bit.
+/*
+void WriteVarLen(FILE* pFile, uint32_t value)
+{
+	uint32_t buffer;
+	
+	buffer = value & 0x7f;
+	
+	while ((value >>= 7) > 0)
+	{
+		buffer <<= 8;
+		buffer |= 0x80;
+		buffer += (value & 0x7f);
+	}
+
+	while (1)
+	{
+		fputc(buffer, pFile);
+		if (buffer & 0x80)
+			buffer >>= 8;
+		else
+			break;
+	}
+}
+
+uint32_t ReadVarLen(FILE* pFile)
+{
+	uint32_t value;
+	uint8_t c;
+
+	if ((value = fgetc(pFile)) & 0x80)
+	{
+		value &= 0x7f;
+		
+		do
+		{
+			value = (value << 7) + ((c = fgetc(pFile)) & 0x7f);
+		} while (c & 0x80);
+	}
+	
+	return value;
+}
+*/
+uint8_t huge* ReadVarLen(uint8_t huge* pData, uint32_t *pValue)
+{
+	uint32_t value;
+	uint8_t c;
+
+	if ((value = *pData++) & 0x80)
+	{
+		value &= 0x7f;
+		
+		do
+		{
+			value = (value << 7) + ((c = *pData++) & 0x7f);
+		} while (c & 0x80);
+	}
+	
+	*pValue = value;
+	
+	return pData;
+}
+
+uint8_t huge* DoMetaEvent(uint8_t huge* pData)
+{
+	uint8_t type;
+	uint32_t length;
+	uint8_t data[16384];
+	
+	type = *pData++;
+	pData = ReadVarLen(pData, &length);
+				
+	switch (type)
+	{
+		case 0x2F:	// End song
+			tracksStopped++;
+			break;
+			
+		// Text-based events
+		case 0x01:	// Text Event
+		case 0x02:	// Copyright Notice
+		case 0x03:	// Sequence/Track Name
+		case 0x04:	// Instrument Name
+		case 0x05:	// Lyric
+		case 0x06:	// Marker
+		case 0x07:	// Cue Point
+			_fmemcpy(data, pData, length);
+			// Zero-terminate string
+			data[length] = 0;
+			printf("Meta-event %u: %s\n", type, data);
+			pData += length;
+			break;
+
+		case 0x51:	// Set Tempo, in microseconds per MIDI quarter-note
+			// Tempo is a 24-bit value, Big-Endian
+			tempo = ((uint32_t)pData[0] << 16) | ((uint16_t)pData[1] << 8) | pData[2];
+			printf("Tempo: %lu\n", tempo);
+			pData += length;
+			
+			// Precalc the divisor for this tempo, for better performance
+			divisor = (tempo*(PITFREQ/1000000.0f))/division;
+			break;
+		
+		// Skip
+		case 0x00:	// Sequence Number
+		case 0x20:	// MIDI Channel Prefix
+		case 0x54:	// SMPTE Offset
+		case 0x58:	// Time Signature
+		case 0x59:	// Key Signature
+		case 0x7F:	// Sequencer-Specific Meta-Event
+		default:
+			printf("Meta-event %02X, length: %lu\n", type, length);
+			pData += length;
+			break;
+	}
+	
+	return pData;
+}
+
+void PreProcessMIDI(FILE* pFile, const char* pOutFile)
+{
+	MIDIHeader header;
+	MIDIChunk track;
+	uint32_t currentTime;
+	uint16_t lastLength;
+	uint16_t i;
+	uint8_t huge* pData;
+	
+	fread(&header, sizeof(header), 1, pFile);
+	
+	// File appears sane?
+	if (memcmp(header.chunk.chunkType, "MThd", 4) != 0)
+	{
+		printf("Header of %c%c%c%c does not appear to be a MIDI file\n", header.chunk.chunkType[0], header.chunk.chunkType[1], header.chunk.chunkType[2], header.chunk.chunkType[3]);
+		
+		return;
+	}
+	
+	header.chunk.length = SWAPL(header.chunk.length);
+	header.format = SWAPS(header.format);
+	header.ntrks = SWAPS(header.ntrks);
+	header.division = SWAPS(header.division);
+	
+	printf("Header type: %c%c%c%c\n", header.chunk.chunkType[0], header.chunk.chunkType[1], header.chunk.chunkType[2], header.chunk.chunkType[3]);
+	printf("Header size: %lu\n", header.chunk.length);
+	printf("Format: %u\n", header.format);
+	printf("Nr of tracks: %u\n", header.ntrks);
+	printf("Division: %u\n", header.division);
+	
+	// If this is not a quarter-note divider, but rather SMPTE, we don't support it yet
+	if (header.division & 0xF000)
+	{
+		printf("Unsupported SMPTE time detected.\n");
+		
+		return;
+	}
+	
+	// Process relevant data from header	
+	division = header.division;
+	nrOfTracks = header.ntrks;
+	
+	// Calculate a default tempo, in case there is no specific Meta-Event
+	divisor = (tempo*(PITFREQ/1000000.0f))/division;
+	
+	// Read all tracks into memory
+	for (i = 0; i < nrOfTracks; i++)
+	{
+		fread(&track, sizeof(track), 1, pFile);
+
+		// File appears sane?
+		if (memcmp(track.chunkType, "MTrk", 4) != 0)
+		{
+			printf("Chunk of %c%c%c%c does not appear to be a MIDI track\n", track.chunkType[0], track.chunkType[1], track.chunkType[2], track.chunkType[3]);
+		
+			return;
+		}
+	
+		track.length = SWAPL(track.length);
+	
+		printf("MIDI track type: %c%c%c%c\n", track.chunkType[0], track.chunkType[1], track.chunkType[2], track.chunkType[3]);
+		printf("Track size: %lu\n", track.length);
+		
+		// Process releveant data from header
+		tracks[i].length = track.length;
+	
+		// Read into memory
+		tracks[i].pData = farmalloc(tracks[i].length);
+		_farfread(tracks[i].pData, tracks[i].length, 1, pFile);
+		tracks[i].pCur = tracks[i].pData;
+	}
+	
+	fclose(pFile);
+	
+	printf("Start preprocessing MIDI\n");
+
+	// Get the first deltas for each stream
+	for (i = 0; i < nrOfTracks; i++)
+	{
+		// Get a delta-time from the stream
+		tracks[i].pCur = ReadVarLen(tracks[i].pCur, &tracks[i].delta);
+	}
+	
+	// Set to rate generator
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	SetTimerCount(0);
+	
+	// Get LSB of timer counter
+	currentTime = inp(CHAN0PORT);
+	
+	// Get MSB of timer counter
+	currentTime |= ((uint16_t)inp(CHAN0PORT)) << 8;
+	
+	// Count down from maximum
+	currentTime |= 0xFFFF0000l;
+	
+	while (playing && (tracksStopped < nrOfTracks))
+	{
+		uint32_t delta, delay, length;
+		uint8_t value, type, t;
+		uint8_t oldTracksStopped;
+		
+		// Detect if a track was stopped
+		oldTracksStopped = tracksStopped;
+		
+		// Select the track with the next event
+		delta = UINT32_MAX;
+		t = 0;
+		
+		for (i = 0; i < nrOfTracks; i++)
+		{
+			if (delta > tracks[i].delta)
+			{
+				t = i;
+				delta = tracks[i].delta;
+			}
+		}
+		
+		// Select data for track
+		pData = tracks[t].pCur;
+		
+		// Adjust all other tracks to the new delta
+		for (i = 0; i < nrOfTracks; i++)
+			tracks[i].delta -= delta;
+		
+		// Perform wait for delta
+		delay = GETMIDIDELAY(delta);
+		tickWaitC(delay, &currentTime);
+		
+		// Get a MIDI command from the stream
+		value = *pData++;
+		
+		switch (value)
+		{
+			// Regular SysEx
+			case 0xF0:
+				pData = ReadVarLen(pData, &length);
+				
+				printf("SysEx F0, length: %lu\n", length);
+				
+				// Pre-pend 0xF0, it is implicit
+				WriteBuffer(pData-1, length+1);
+				pData += length;
+				break;
+			// Escaped SysEx
+			case 0xF7:
+				pData = ReadVarLen(pData, &length);
+				
+				printf("SysEx F7, length: %lu\n", length);
+				
+				WriteBuffer(pData, length);
+				pData += length;
+				break;
+			// Meta event
+			case 0xFF:
+				pData = DoMetaEvent(pData);
+				break;
+				
+			// Regular MIDI channel message
+			default:
+				// Not a status byte, use running-status
+				if (value < 0x80)
+					length = lastLength;
+				else
+				{
+					type = value & 0xF0;
+					
+					switch (type)
+					{
+						// System message?
+						case SYSTEM:
+							length = 0;
+							break;
+						// Single-byte message?
+						case PC:
+						case CHANNEL_AFTERTOUCH:
+							length = 1;
+							break;
+						// Double-byte message
+						default:
+							length = 2;
+							break;
+					}
+					
+					// Store data for running-status mode
+					// Length will be 1 shorter, because the status byte will be omitted
+					lastLength = length - 1;
+				}
+					
+				// Send first byte as well
+				WriteBuffer(pData-1, length+1);
+				pData += length;
+				break;
+		}
+		
+		// Get a delta-time from the stream
+		if (oldTracksStopped == tracksStopped)
+			tracks[t].pCur = ReadVarLen(pData, &tracks[t].delta);
+		else
+			tracks[t].delta = UINT32_MAX;
+	}
+
+	// Reset to square wave
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	SetTimerCount(0);
+	
+	// Free all memory
+	for (i = 0; i < nrOfTracks; i++)
+		farfree(tracks[i].pData);
+
+	printf("Done preprocessing MIDI\n");
+}
+
+
 void SavePreprocessed(const char* pFileName)
 {
 	FILE* pFile = fopen(pFileName, "wb");
@@ -1672,8 +2087,9 @@ void PlayPoll1(const char* pVGMFile)
 			LoadPreprocessed("out.pre");
 			break;
 		case FT_MIDIFile:
-			// TODO
+			PreProcessMIDI(pFile, "out.pre");
 			fclose(pFile);
+			LoadPreprocessed("out.pre");
 			break;
 		case FT_PreFile:
 			fclose(pFile);
@@ -1714,8 +2130,9 @@ void PlayPoll2(const char* pVGMFile)
 			LoadPreprocessed("out.pre");
 			break;
 		case FT_MIDIFile:
-			// TODO
+			PreProcessMIDI(pFile, "out.pre");
 			fclose(pFile);
+			LoadPreprocessed("out.pre");
 			break;
 		case FT_PreFile:
 			fclose(pFile);
@@ -1762,8 +2179,9 @@ void PlayPoll3(const char* pVGMFile)
 			LoadPreprocessed("out.pre");
 			break;
 		case FT_MIDIFile:
-			// TODO
+			PreProcessMIDI(pFile, "out.pre");
 			fclose(pFile);
+			LoadPreprocessed("out.pre");
 			break;
 		case FT_PreFile:
 			fclose(pFile);
@@ -1813,8 +2231,9 @@ void PlayInt(const char* pVGMFile)
 			LoadPreprocessed("out.pre");
 			break;
 		case FT_MIDIFile:
-			// TODO
+			PreProcessMIDI(pFile, "out.pre");
 			fclose(pFile);
+			LoadPreprocessed("out.pre");
 			break;
 		case FT_PreFile:
 			fclose(pFile);
@@ -1904,6 +2323,7 @@ int main(int argc, char* argv[])
 	InitPCjrAudio();
 	//SetPCjrAudio(1,440,15);
 	//InitPCSpeaker();
+	InitMPU401();
 
 	// Set up channels to play samples, by setting frequency 0
 	//SetPCjrAudio(0,0,15);
@@ -1943,6 +2363,7 @@ int main(int argc, char* argv[])
 
 	ClosePCjrAudio();
 	//ClosePCSpeaker();
+	CloseMPU401();
 
 	return 0;
 }

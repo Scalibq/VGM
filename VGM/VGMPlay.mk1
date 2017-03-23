@@ -13,6 +13,13 @@ MON\C\COMMON.C .AUTODEPEND
  *wcc ..\COMMON\C\COMMON.C -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -&
 zq -otexan -ob -ol -ol+ -oc -oi -d2 -fpc -bt=dos -fo=.obj -ms
 
+I:\Programming\Oldskool\DOS\VGM\MPU401.obj : I:\Programming\Oldskool\DOS\COM&
+MON\C\MPU401.c .AUTODEPEND
+ @I:
+ cd I:\Programming\Oldskool\DOS\VGM
+ *wcc ..\COMMON\C\MPU401.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -&
+zq -otexan -ob -ol -ol+ -oc -oi -d2 -fpc -bt=dos -fo=.obj -ms
+
 I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj : I:\Programming\Oldskool\DOS\VG&
 M\VGMPlay.c .AUTODEPEND
  @I:
@@ -22,12 +29,13 @@ M\VGMPlay.c .AUTODEPEND
 
 I:\Programming\Oldskool\DOS\VGM\VGMPlay.exe : I:\Programming\Oldskool\DOS\VG&
 M\8259A.obj I:\Programming\Oldskool\DOS\VGM\COMMON.obj I:\Programming\Oldsko&
-ol\DOS\VGM\VGMPlay.obj I:\Programming\Oldskool\DOS\COMMON\C\8253.h I:\Progra&
-mming\Oldskool\DOS\COMMON\C\8259A.H I:\Programming\Oldskool\DOS\COMMON\C\COM&
-MON.H I:\Programming\Oldskool\DOS\COMMON\C\TYPES.H .AUTODEPEND
+ol\DOS\VGM\MPU401.obj I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj I:\Program&
+ming\Oldskool\DOS\COMMON\C\8253.h I:\Programming\Oldskool\DOS\COMMON\C\8259A&
+.H I:\Programming\Oldskool\DOS\COMMON\C\COMMON.H I:\Programming\Oldskool\DOS&
+\COMMON\C\MPU401.h I:\Programming\Oldskool\DOS\COMMON\C\TYPES.H .AUTODEPEND
  @I:
  cd I:\Programming\Oldskool\DOS\VGM
- @%write VGMPlay.lk1 FIL 8259A.obj,COMMON.obj,VGMPlay.obj
+ @%write VGMPlay.lk1 FIL 8259A.obj,COMMON.obj,MPU401.obj,VGMPlay.obj
  @%append VGMPlay.lk1 
  *wlink name VGMPlay d all sys dos op m op maxe=25 op q op symf @VGMPlay.lk1
 
