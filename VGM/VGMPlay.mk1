@@ -32,7 +32,9 @@ M\8259A.obj I:\Programming\Oldskool\DOS\VGM\COMMON.obj I:\Programming\Oldsko&
 ol\DOS\VGM\MPU401.obj I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj I:\Program&
 ming\Oldskool\DOS\COMMON\C\8253.h I:\Programming\Oldskool\DOS\COMMON\C\8259A&
 .H I:\Programming\Oldskool\DOS\COMMON\C\COMMON.H I:\Programming\Oldskool\DOS&
-\COMMON\C\MPU401.h I:\Programming\Oldskool\DOS\COMMON\C\TYPES.H .AUTODEPEND
+\COMMON\C\MPU401.h I:\Programming\Oldskool\DOS\COMMON\C\stdtype.h I:\Program&
+ming\Oldskool\DOS\COMMON\C\TYPES.H I:\Programming\Oldskool\DOS\COMMON\C\VGMF&
+ile.h .AUTODEPEND
  @I:
  cd I:\Programming\Oldskool\DOS\VGM
  @%write VGMPlay.lk1 FIL 8259A.obj,COMMON.obj,MPU401.obj,VGMPlay.obj

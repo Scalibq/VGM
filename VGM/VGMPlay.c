@@ -8,35 +8,14 @@
 #include <string.h>
 #include "8253.h"
 #include "8259A.h"
+#include "stdtype.h"	// VGMFile.h uses nonstandard types, define them separately
+#include "VGMFile.h"
 #include "MIDI.h"
 #include "MPU401.h"
 #include "Endianness.h"
 
 #define M_PI 3.1415926535897932384626433832795
 
-typedef struct
-{
-	uint32_t VGMIdent, EOFoffset, Version, SN76489clock;
-	uint32_t YM2413clock, GD3offset, totalSamples, loopOffset;
-	uint32_t loopNumSamples, Rate;
-	uint16_t SNFB;
-	uint8_t _SNW, _SF;
-	uint32_t YM2612clock, YM2151clock, VGMdataoffset, SegaPCMclock, SPCMInterface;
-	uint32_t RF5C68clock, YM2203clock, YM2608clock, YM2610Bclock;
-	uint32_t YM3812clock, YM3526clock, Y8950clock, YMF262clock;
-	uint32_t YMF278Bclock, YMF271clock, YMZ280Bclock, RF5C164clock;
-	uint32_t PWMclock, AY8910clock;
-	uint8_t _AYT;
-	uint8_t AYFlags[2];
-    uint8_t _VM, reserved1, _LB, _LM;
-    uint32_t GBDMGclock, NESAPUclock, MultiPCMclock, uPD7759clock;
-	uint32_t OKIM6258clock;
-	uint8_t _OF, _KF, _CF, reserved2;
-	uint32_t OKIM6295clock, K051649clock, K054539clock, HuC6280clock, C140clock;
-	uint32_t K053260clock, Pokeyclock, QSoundclock, SCSPclock, extraHdroffset;
-} VGMHeader;
-
-#define VFileIdent 0x206d6756
 //#define SNReg 0xC0
 #define SNFreq 3579540
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
@@ -645,7 +624,7 @@ void PlayImmediate(const char* pVGMFile)
 	FILE* pFile;
 	uint32_t delay;
 	uint16_t srcDelay;
-	VGMHeader header;
+	VGM_HEADER header;
 	uint32_t idx;
 	uint32_t currentTime;
 	
@@ -654,25 +633,25 @@ void PlayImmediate(const char* pVGMFile)
 	fread(&header, sizeof(header), 1, pFile);
 	
 	// File appears sane?
-	if (header.VGMIdent != VFileIdent)
+	if (header.fccVGM != FCC_VGM)
 	{
-		printf("Header of %08X does not appear to be a VGM file\n", header.VGMIdent);
+		printf("Header of %08X does not appear to be a VGM file\n", header.fccVGM);
 		
 		return;
 	}
 	
 	printf("%s details:\n", pVGMFile);
-	printf("EoF Offset: %08X\n", header.EOFoffset);
-	printf("Version: %08X\n", header.Version);
-	printf("GD3 Offset: %08X\n", header.GD3offset);
-	printf("Total # samples: %lu\n", header.totalSamples);
-	printf("Playback Rate: %08X\n", header.Rate);
-	printf("VGM Data Offset: %08X\n", header.VGMdataoffset);
+	printf("EoF Offset: %08X\n", header.lngEOFOffset);
+	printf("Version: %08X\n", header.lngVersion);
+	printf("GD3 Offset: %08X\n", header.lngGD3Offset);
+	printf("Total # samples: %lu\n", header.lngTotalSamples);
+	printf("Playback Rate: %08X\n", header.lngRate);
+	printf("VGM Data Offset: %08X\n", header.lngDataOffset);
 
-    if (header.VGMdataoffset == 0)
+    if (header.lngDataOffset == 0)
 		idx = 0x40;
 	else
-		idx = header.VGMdataoffset + 0x34;
+		idx = header.lngDataOffset + 0x34;
 	
 	printf("VGM Data starts at %08X\n", idx);
 	
@@ -967,7 +946,7 @@ typedef enum
 
 FileType GetFileType(FILE* pFile)
 {
-	VGMHeader* pVGMHeader;
+	VGM_HEADER* pVGMHeader;
 	PreHeader* pPreHeader;
 	MIDIHeader* pMIDIHeader;
 	
@@ -978,8 +957,8 @@ FileType GetFileType(FILE* pFile)
 	fseek(pFile, 0, SEEK_SET);
 	
 	// Try VGM
-	pVGMHeader = (VGMHeader*)data;
-	if (pVGMHeader->VGMIdent == VFileIdent)
+	pVGMHeader = (VGM_HEADER*)data;
+	if (pVGMHeader->fccVGM == FCC_VGM)
 		return FT_VGMFile;
 	
 	// Try MIDI
@@ -1000,7 +979,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	FILE* pOut;
 	uint32_t delay;
 	uint16_t srcDelay;
-	VGMHeader header;
+	VGM_HEADER header;
 	uint32_t idx, size;
 	uint16_t firstDelay;
 	uint16_t i, j;
@@ -1008,25 +987,25 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	fread(&header, sizeof(header), 1, pFile);
 	
 	// File appears sane?
-	if (header.VGMIdent != VFileIdent)
+	if (header.fccVGM != FCC_VGM)
 	{
-		printf("Header of %08X does not appear to be a VGM file\n", header.VGMIdent);
+		printf("Header of %08X does not appear to be a VGM file\n", header.fccVGM);
 		
 		return;
 	}
 	
 	printf("VGM file details:\n");
-	printf("EoF Offset: %08X\n", header.EOFoffset);
-	printf("Version: %08X\n", header.Version);
-	printf("GD3 Offset: %08X\n", header.GD3offset);
-	printf("Total # samples: %lu\n", header.totalSamples);
-	printf("Playback Rate: %08X\n", header.Rate);
-	printf("VGM Data Offset: %08X\n", header.VGMdataoffset);
+	printf("EoF Offset: %08X\n", header.lngEOFOffset);
+	printf("Version: %08X\n", header.lngVersion);
+	printf("GD3 Offset: %08X\n", header.lngGD3Offset);
+	printf("Total # samples: %lu\n", header.lngTotalSamples);
+	printf("Playback Rate: %08X\n", header.lngRate);
+	printf("VGM Data Offset: %08X\n", header.lngDataOffset);
 
-    if (header.VGMdataoffset == 0)
+    if (header.lngDataOffset == 0)
 		idx = 0x40;
 	else
-		idx = header.VGMdataoffset + 0x34;
+		idx = header.lngDataOffset + 0x34;
 	
 	printf("VGM Data starts at %08X\n", idx);
 	
@@ -1048,11 +1027,11 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	pOut = fopen(pOutFile, "wb");
 	
 	// Detect used chips
-	preHeader.nrOfSN76489 = (header.SN76489clock != 0) + ((header.SN76489clock & 0x40000000L) != 0);
-	//preHeader.nrOfSAA1099 = (header.SAA1099clock != 0) + ((header.SAA1099clock & 0x40000000L) != 0);
-	//preHeader.nrOfAY8930 = (header.AY8930clock != 0) + ((header.AY8930clock & 0x40000000L) != 0);
-	preHeader.nrOfYM3812 = (header.YM3812clock != 0) + ((header.YM3812clock & 0x40000000L) != 0);
-	preHeader.nrOfYMF262 = (header.YMF262clock != 0) + ((header.YMF262clock & 0x40000000L) != 0);
+	preHeader.nrOfSN76489 = (header.lngHzPSG != 0) + ((header.lngHzPSG & 0x40000000L) != 0);
+	preHeader.nrOfSAA1099 = (header.lngHzSAA1099 != 0) + ((header.lngHzSAA1099 & 0x40000000L) != 0);
+	preHeader.nrOfAY8930 = (header.lngHzAY8910 != 0) + ((header.lngHzAY8910 & 0x40000000L) != 0);
+	preHeader.nrOfYM3812 = (header.lngHzYM3812 != 0) + ((header.lngHzYM3812 & 0x40000000L) != 0);
+	preHeader.nrOfYMF262 = (header.lngHzYMF262 != 0) + ((header.lngHzYMF262 & 0x40000000L) != 0);
 	preHeader.nrOfMIDI = 0;
 	
 	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
