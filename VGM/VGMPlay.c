@@ -1028,12 +1028,26 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	pOut = fopen(pOutFile, "wb");
 	
 	// Detect used chips
+	preHeader.nrOfMIDI = 0;	// Not (yet?) supported in VGM
 	preHeader.nrOfSN76489 = (header.lngHzPSG != 0) + ((header.lngHzPSG & 0x40000000L) != 0);
-	preHeader.nrOfSAA1099 = (header.lngHzSAA1099 != 0) + ((header.lngHzSAA1099 & 0x40000000L) != 0);
-	preHeader.nrOfAY8930 = (header.lngHzAY8910 != 0) + ((header.lngHzAY8910 & 0x40000000L) != 0);
-	preHeader.nrOfYM3812 = (header.lngHzYM3812 != 0) + ((header.lngHzYM3812 & 0x40000000L) != 0);
-	preHeader.nrOfYMF262 = (header.lngHzYMF262 != 0) + ((header.lngHzYMF262 & 0x40000000L) != 0);
-	preHeader.nrOfMIDI = 0;
+	
+	if (header.lngVersion >= 0x151)
+	{
+		preHeader.nrOfAY8930 = (header.lngHzAY8910 != 0) + ((header.lngHzAY8910 & 0x40000000L) != 0);
+		preHeader.nrOfYM3812 = (header.lngHzYM3812 != 0) + ((header.lngHzYM3812 & 0x40000000L) != 0);
+		preHeader.nrOfYMF262 = (header.lngHzYMF262 != 0) + ((header.lngHzYMF262 & 0x40000000L) != 0);
+	}
+	else
+	{
+		preHeader.nrOfAY8930 = 0;
+		preHeader.nrOfYM3812 = 0;
+		preHeader.nrOfYMF262 = 0;
+	}
+	
+	if (header.lngVersion >= 0x170)
+		preHeader.nrOfSAA1099 = (header.lngHzSAA1099 != 0) + ((header.lngHzSAA1099 & 0x40000000L) != 0);
+	else
+		preHeader.nrOfSAA1099 = 0;
 	
 	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
 	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
