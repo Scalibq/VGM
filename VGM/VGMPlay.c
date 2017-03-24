@@ -61,15 +61,16 @@ typedef struct _PreHeader
 } PreHeader;
 
 PreHeader preHeader = {
-	{'P','r','e','V'},
-	sizeof(PreHeader),
-	0x01,
-	0,	// nrOfSN76489;
-	0,	// nrOfSAA1099;
-	0,	// nrOfAY8930;
-	0,	// nrOfYM3812;
-	0,	// nrOfYMF262;
-	0,	// nrOfMIDI;
+	{'P','r','e','V'},	// marker
+	sizeof(PreHeader),	// headerLen
+	0,					// size
+	0x01,				// version
+	0,					// nrOfSN76489;
+	0,					// nrOfSAA1099;
+	0,					// nrOfAY8930;
+	0,					// nrOfYM3812;
+	0,					// nrOfYMF262;
+	0,					// nrOfMIDI;
 };
 
 void SetTimerCount(uint16_t rate);
