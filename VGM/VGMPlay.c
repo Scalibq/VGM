@@ -41,7 +41,7 @@
 
 uint16_t SNReg[MAX_MULTICHIP] = { 0xC0, 0xC0 };
 uint16_t SAAReg[MAX_MULTICHIP] = { 0x220, 0x222 };
-uint16_t AYReg[MAX_MULTICHIP] = { 0, 0 };
+uint16_t AYReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 uint16_t OPL2Reg[MAX_MULTICHIP] = { 0x388, 0x388 };
 uint16_t OPL3Reg[MAX_MULTICHIP*2] = { 0x220, 0x222, 0x220, 0x222 };	// Special case: there are two separate ports for the chip
 uint16_t MPUReg[MAX_MULTICHIP] = { 0x330 };
@@ -401,7 +401,13 @@ void PlayData(void)
 				
 	for (i = 0; i < preHeader.nrOfAY8930; i++)
 	{
-		// TODO
+		count = *pBuf++;
+	
+		while (count--)
+		{
+			outp(AYReg[i], *pBuf++);
+			outp(AYReg[i]+4, *pBuf++);
+		}
 	}
 		
 	for (i = 0; i < preHeader.nrOfYM3812; i++)
@@ -417,7 +423,7 @@ void PlayData(void)
 		
 	for (i = 0; i < preHeader.nrOfYMF262; i++)
 	{
-		// First port 0
+		// First port 0 commands
 		count = *pBuf++;
 			
 		while (count--)
@@ -426,7 +432,7 @@ void PlayData(void)
 			outp(OPL3Reg[i*2]+1, *pBuf++);
 		}
 
-		// Second port 1
+		// Then port 1 commands
 		count = *pBuf++;
 			
 		while (count--)
@@ -809,6 +815,15 @@ void PlayImmediate(const char* pVGMFile)
 				outp(OPL3Reg[1], fgetc(pFile));
 				outp(OPL3Reg[1]+1, fgetc(pFile));
 				break;
+			case 0xA0:	// aa dd : AY8910, write value dd to register aa
+				// Second chip is indicated by msb in first byte
+				value = fgetc(pFile);
+				i = (value & 0x80) ? 1 : 0;
+
+				outp(AYReg[i], value & 0x7F);
+				outp(AYReg[i]+4, fgetc(pFile));
+				break;
+				
 			case 0xBD:	// aa dd : SAA1099, write value dd to register aa
 				// Second chip is indicated by msb in first byte
 				value = fgetc(pFile);
@@ -883,7 +898,6 @@ void BufferMIDI(uint8_t huge* pBuf, uint16_t len)
 	}
 }
 
-
 void OutputCommands(FILE* pOut)
 {
 	uint16_t count, length, i;
@@ -912,7 +926,13 @@ void OutputCommands(FILE* pOut)
 				
 	for (i = 0; i < preHeader.nrOfAY8930; i++)
 	{
-		// TODO
+		length = pCommands[i][AY8930] - commands[i][AY8930];
+		count = (length - 1) / 2;
+
+		if (count > 255)
+			printf("Too many AY8930 commands: %u!\n", count);
+		commands[i][AY8930][0] = count;
+		fwrite(commands[i][AY8930], length, 1, pOut);
 	}
 
 	for (i = 0; i < preHeader.nrOfYM3812; i++)
@@ -928,7 +948,7 @@ void OutputCommands(FILE* pOut)
 
 	for (i = 0; i < preHeader.nrOfYMF262; i++)
 	{
-		// Port 0 first
+		// First port 0 commands
 		length = pCommands[i][YMF262PORT0] - commands[i][YMF262PORT0];
 		count = (length - 1) / 2;
 
@@ -937,7 +957,7 @@ void OutputCommands(FILE* pOut)
 		commands[i][YMF262PORT0][0] = count;
 		fwrite(commands[i][YMF262PORT0], length, 1, pOut);
 
-		// Port 1 second
+		// Then port 1 commands
 		length = pCommands[i][YMF262PORT1] - commands[i][YMF262PORT1];
 		count = (length - 1) / 2;
 
@@ -1212,7 +1232,14 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 				*pCommands[0][YMF262PORT1]++ = fgetc(pFile);
 				*pCommands[0][YMF262PORT1]++ = fgetc(pFile);
 				break;
-				
+			case 0xA0:	// aa dd : AY8910, write value dd to register aa
+				// Second chip is indicated by msb in first byte
+				value = fgetc(pFile);
+				i = (value & 0x80) ? 1 : 0;
+
+				*pCommands[i][AY8930]++ = value & 0x7F;
+				*pCommands[i][AY8930]++ = fgetc(pFile);
+				break;
 			case 0xBD:	// aa dd : SAA1099, write value dd to register aa
 				// Second chip is indicated by msb in first byte
 				value = fgetc(pFile);
