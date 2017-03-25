@@ -40,7 +40,7 @@
 #define MAX_MULTICHIP 2
 
 uint16_t SNReg[MAX_MULTICHIP] = { 0xC0, 0xC0 };
-uint16_t SAAReg[MAX_MULTICHIP] = { 0, 0 };
+uint16_t SAAReg[MAX_MULTICHIP] = { 0x220, 0x222 };
 uint16_t AYReg[MAX_MULTICHIP] = { 0, 0 };
 uint16_t OPL2Reg[MAX_MULTICHIP] = { 0x388, 0x388 };
 uint16_t OPL3Reg[MAX_MULTICHIP*2] = { 0x220, 0x222, 0x220, 0x222 };	// Special case: there are two separate ports for the chip
@@ -390,7 +390,13 @@ void PlayData(void)
 		
 	for (i = 0; i < preHeader.nrOfSAA1099; i++)
 	{
-		// TODO
+		count = *pBuf++;
+	
+		while (count--)
+		{
+			outp(SAAReg[i]+1, *pBuf++);
+			outp(SAAReg[i], *pBuf++);
+		}
 	}
 				
 	for (i = 0; i < preHeader.nrOfAY8930; i++)
@@ -628,6 +634,7 @@ void PlayImmediate(const char* pVGMFile)
 	VGM_HEADER header;
 	uint32_t idx;
 	uint32_t currentTime;
+	uint8_t i;
 	
 	pFile = fopen(pVGMFile, "rb");	
 
@@ -802,6 +809,15 @@ void PlayImmediate(const char* pVGMFile)
 				outp(OPL3Reg[1], fgetc(pFile));
 				outp(OPL3Reg[1]+1, fgetc(pFile));
 				break;
+			case 0xBD:	// aa dd : SAA1099, write value dd to register aa
+				// Second chip is indicated by msb in first byte
+				value = fgetc(pFile);
+				i = (value & 0x80) ? 1 : 0;
+
+				outp(SAAReg[i]+1, value & 0x7F);
+				outp(SAAReg[i], fgetc(pFile));
+				break;
+			
 			case 0x51:	// aa dd : YM2413, write value dd to register aa
 			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
 			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
@@ -885,7 +901,13 @@ void OutputCommands(FILE* pOut)
 		
 	for (i = 0; i < preHeader.nrOfSAA1099; i++)
 	{
-		// TODO
+		length = pCommands[i][SAA1099] - commands[i][SAA1099];
+		count = (length - 1) / 2;
+
+		if (count > 255)
+			printf("Too many SAA1099 commands: %u!\n", count);
+		commands[i][SAA1099][0] = count;
+		fwrite(commands[i][SAA1099], length, 1, pOut);
 	}
 				
 	for (i = 0; i < preHeader.nrOfAY8930; i++)
@@ -1196,7 +1218,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 				value = fgetc(pFile);
 				i = (value & 0x80) ? 1 : 0;
 
-				*pCommands[i][SAA1099]++ = value;
+				*pCommands[i][SAA1099]++ = value & 0x7F;
 				*pCommands[i][SAA1099]++ = fgetc(pFile);
 				break;
 			
