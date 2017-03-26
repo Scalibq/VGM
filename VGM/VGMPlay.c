@@ -234,8 +234,6 @@ void InitSB(void)
 {
 	uint8_t c;
 	
-	printf("InitSB\n");
-	
 	// For all channels
 	for (c = 0; c < 16; c++)
 	{
