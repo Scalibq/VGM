@@ -12,7 +12,13 @@
 #include "VGMFile.h"
 #include "MIDI.h"
 #include "MPU401.h"
+#include "IMFC.h"
+#include "SB.h"
 #include "Endianness.h"
+
+//#define MPU401
+//#define IMFC
+#define SB
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -43,7 +49,9 @@ uint16_t SAAReg[MAX_MULTICHIP] = { 0x220, 0x222 };
 uint16_t AYReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 uint16_t OPL2Reg[MAX_MULTICHIP] = { 0x388, 0x388 };
 uint16_t OPL3Reg[MAX_MULTICHIP*2] = { 0x220, 0x222, 0x220, 0x222 };	// Special case: there are two separate ports for the chip
-uint16_t MPUReg[MAX_MULTICHIP] = { 0x330 };
+uint16_t MPUReg[MAX_MULTICHIP] = { 0x330, 0x330 };
+uint16_t IMFCReg[MAX_MULTICHIP] = { 0x2A20, 0x2A20 };
+uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 
 typedef struct _PreHeader
 {
@@ -80,7 +88,14 @@ void OutputMIDI(uint16_t base, uint8_t huge* pBuf, uint16_t len)
 	
 	for (i = 0; i < len; i++)
 	{
+#if defined(MPU401)
 		put_mpu_out(base, pBuf[i]);
+#elif defined(IMFC)
+		WriteDataToIMFC(base, pBuf[i]);
+#elif defined(SB)
+		WriteDSP(base, 0x38);
+		WriteDSP(base, pBuf[i]);
+#endif
 	}
 }
 
@@ -127,6 +142,142 @@ void CloseMPU401(void)
 	OutputMIDI(MPUReg[0], GMReset, _countof(GMReset));
 	
 	reset_mpu(MPUReg[0]);
+}
+
+void InitIMFC(void)
+{
+	uint8_t c;
+	
+	// Initialize PIU
+	outp(IMFCReg[0] + PCR, PCR_INIT);
+	
+	// Write Interrupt Enable
+	outp(IMFCReg[0] + PCR, PCR_SET_WIE);
+	
+	// Music Card Message (1e5 - Reboot)
+	//WriteCommandToIMFC(IMFCReg[0], IMFC_REBOOT);
+	
+	// Music Card Message (1e0 - Set mode)
+	WriteCommandToIMFC(IMFCReg[0], IMFC_MODE);
+	
+	// Music Card Message (Set MUSIC mode)
+	//WriteCommandToIMFC(IMFCReg[0], 0x00);
+	
+	// Music Card Message (Set THRU mode)
+	WriteCommandToIMFC(IMFCReg[0], 0x01);
+
+	// Music Card Message (1e2 - Set Path Status Byte)
+	WriteCommandToIMFC(IMFCReg[0], IMFC_SET_PATH);
+	
+	// Music Card Message (Set Path MIDI IN > System, All blocked) 
+	WriteCommandToIMFC(IMFCReg[0], 0x00);
+	
+	// Music Card Message (Set Path System > MIDI OUT, Accept all MIDI messages)
+	WriteCommandToIMFC(IMFCReg[0], 0x7f);
+	
+	// Music Card Message (Set Path MIDI IN > SP, All Blocked)
+	WriteCommandToIMFC(IMFCReg[0], 0x00);
+	
+	// Music Card Message (Set Path System > SP, Accept all MIDI messages)
+	WriteCommandToIMFC(IMFCReg[0], 0x7f);
+	
+	// Music Card Message (Set Path MIDI IN > MIDI OUT, All Blocked)
+	WriteCommandToIMFC(IMFCReg[0], 0x00);
+	
+	// Turn all notes off
+	// For all channels
+	for (c = 0; c < 16; c++)
+	{
+		// Send All Notes Off
+		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0], 123);
+		
+		// Reset all controllers
+		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0], 121);
+		
+		// Send All Sound Off
+		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0], 120);
+	}
+	
+	OutputMIDI(IMFCReg[0], GMReset, _countof(GMReset));
+}
+
+void CloseIMFC(void)
+{
+	uint8_t c;
+	
+	// For all channels
+	for (c = 0; c < 16; c++)
+	{
+		// Send All Notes Off
+		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0], 123);
+		
+		// Reset all controllers
+		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0], 121);
+
+		// Send All Sound Off
+		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0], 120);
+	}
+	
+	OutputMIDI(IMFCReg[0], GMReset, _countof(GMReset));
+	
+	// Music Card Message (1e5 - Reboot)
+	WriteCommandToIMFC(IMFCReg[0], 0xe5);
+}
+
+void InitSB(void)
+{
+	uint8_t c;
+	
+	printf("InitSB\n");
+	
+	// For all channels
+	for (c = 0; c < 16; c++)
+	{
+		// Send All Notes Off
+		WriteDSP(SBReg[0], 0x38);
+		WriteDSP(SBReg[0], 0xB0 + c);
+		WriteDSP(SBReg[0], 0x38);
+		WriteDSP(SBReg[0], 123);
+		
+		// Send All Sound Off
+		WriteDSP(SBReg[0], 0x38);
+		WriteDSP(SBReg[0], 0xB0 + c);
+		WriteDSP(SBReg[0], 0x38);
+		WriteDSP(SBReg[0], 120);
+	}
+
+	OutputMIDI(SBReg[0], GMReset, _countof(GMReset));
+}
+
+void CloseSB(void)
+{
+	uint8_t c;
+		
+	// For all channels
+	for (c = 0; c < 16; c++)
+	{
+		// Send All Notes Off
+		WriteDSP(SBReg[0], 0x38);
+		WriteDSP(SBReg[0], 0xB0 + c);
+		WriteDSP(SBReg[0], 0x38);
+		WriteDSP(SBReg[0], 123);
+		
+		// Send All Sound Off
+		WriteDSP(SBReg[0], 0x38);
+		WriteDSP(SBReg[0], 0xB0 + c);
+		WriteDSP(SBReg[0], 0x38);
+		WriteDSP(SBReg[0], 120);
+	}
+	
+	OutputMIDI(SBReg[0], GMReset, _countof(GMReset));
+	
+	ResetDSP(SBReg[0]);
 }
 
 void InitPCjrAudio(void)
@@ -444,9 +595,15 @@ void PlayData(void)
 	for (i = 0; i < preHeader.nrOfMIDI; i++)
 	{
 		count = *pBuf++;
-		
+
+#if defined(MPU401)		
 		OutputMIDI(MPUReg[i], pBuf, count);
-		
+#elif defined(IMFC)
+		OutputMIDI(IMFCReg[i], pBuf, count);
+#elif defined(SB)
+		OutputMIDI(SBReg[i], pBuf, count);
+#endif
+
 		pBuf += count;
 	}
 }
@@ -2442,7 +2599,13 @@ int main(int argc, char* argv[])
 	InitPCjrAudio();
 	//SetPCjrAudio(1,440,15);
 	//InitPCSpeaker();
+#if defined(MPU401)
 	InitMPU401();
+#elif defined(IMFC)
+	InitIMFC();
+#elif defined(SB)
+	InitSB();
+#endif
 
 	// Set up channels to play samples, by setting frequency 0
 	//SetPCjrAudio(0,0,15);
@@ -2482,7 +2645,13 @@ int main(int argc, char* argv[])
 
 	ClosePCjrAudio();
 	//ClosePCSpeaker();
+#if defined(MPU401)
 	CloseMPU401();
+#elif defined(IMFC)
+	CloseIMFC();
+#elif defined(SB)
+	CloseSB();
+#endif
 
 	return 0;
 }
