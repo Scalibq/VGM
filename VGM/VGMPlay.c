@@ -16,7 +16,6 @@
 
 #define M_PI 3.1415926535897932384626433832795
 
-//#define SNReg 0xC0
 #define SNFreq 3579540
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
 #define SampleRate 44100
@@ -75,13 +74,13 @@ PreHeader preHeader = {
 
 void SetTimerCount(uint16_t rate);
 
-void WriteBuffer(uint8_t huge* pBuf, uint16_t len)
+void OutputMIDI(uint16_t base, uint8_t huge* pBuf, uint16_t len)
 {
 	uint16_t i;
 	
 	for (i = 0; i < len; i++)
 	{
-		put_mpu_out(0x330, pBuf[i]);
+		put_mpu_out(base, pBuf[i]);
 	}
 }
 
@@ -92,21 +91,21 @@ void InitMPU401(void)
 {
 	uint8_t c;
 	
-	set_uart(0x330);
+	set_uart(MPUReg[0]);
 	
 	// For all channels
 	for (c = 0; c < 16; c++)
 	{
 		// Send All Notes Off
-		put_mpu_out(0x330, 0xB0 + c);
-		put_mpu_out(0x330, 123);
+		put_mpu_out(MPUReg[0], 0xB0 + c);
+		put_mpu_out(MPUReg[0], 123);
 		
 		// Send All Sound Off
-		put_mpu_out(0x330, 0xB0 + c);
-		put_mpu_out(0x330, 120);
+		put_mpu_out(MPUReg[0], 0xB0 + c);
+		put_mpu_out(MPUReg[0], 120);
 	}
 	
-	WriteBuffer(GMReset, _countof(GMReset));
+	OutputMIDI(MPUReg[0], GMReset, _countof(GMReset));
 }
 
 void CloseMPU401(void)
@@ -117,17 +116,17 @@ void CloseMPU401(void)
 	for (c = 0; c < 16; c++)
 	{
 		// Send All Notes Off
-		put_mpu_out(0x330, 0xB0 + c);
-		put_mpu_out(0x330, 123);
+		put_mpu_out(MPUReg[0], 0xB0 + c);
+		put_mpu_out(MPUReg[0], 123);
 		
 		// Send All Sound Off
-		put_mpu_out(0x330, 0xB0 + c);
-		put_mpu_out(0x330, 120);
+		put_mpu_out(MPUReg[0], 0xB0 + c);
+		put_mpu_out(MPUReg[0], 120);
 	}
 	
-	WriteBuffer(GMReset, _countof(GMReset));
+	OutputMIDI(MPUReg[0], GMReset, _countof(GMReset));
 	
-	reset_mpu(0x330);
+	reset_mpu(MPUReg[0]);
 }
 
 void InitPCjrAudio(void)
@@ -446,7 +445,7 @@ void PlayData(void)
 	{
 		count = *pBuf++;
 		
-		WriteBuffer(pBuf, count);
+		OutputMIDI(MPUReg[i], pBuf, count);
 		
 		pBuf += count;
 	}
@@ -887,16 +886,6 @@ void SavePreprocessed(const char* pFileName);
 
 uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][256];
 uint8_t* pCommands[MAX_MULTICHIP][NUM_CHIPS];
-
-void BufferMIDI(uint8_t huge* pBuf, uint16_t len)
-{
-	uint16_t i;
-	
-	for (i = 0; i < len; i++)
-	{
-		*pCommands[0][MIDI]++ = *pBuf++;
-	}
-}
 
 void OutputCommands(FILE* pOut)
 {
@@ -1674,7 +1663,8 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				printf("SysEx F0, length: %lu\n", length);
 				
 				// Pre-pend 0xF0, it is implicit
-				BufferMIDI(pData-1, length+1);
+				_fmemcpy(pCommands[0][MIDI], pData-1, length+1);
+				pCommands[0][MIDI] += length + 1;
 				pData += length;
 				break;
 			// Escaped SysEx
@@ -1683,7 +1673,8 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				
 				printf("SysEx F7, length: %lu\n", length);
 				
-				BufferMIDI(pData, length);
+				_fmemcpy(pCommands[0][MIDI], pData, length);
+				pCommands[0][MIDI] += length;
 				pData += length;
 				break;
 			// Meta event
@@ -1723,7 +1714,8 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				}
 					
 				// Send first byte as well
-				BufferMIDI(pData-1, length+1);
+				_fmemcpy(pCommands[0][MIDI], pData-1, length+1);
+				pCommands[0][MIDI] += length + 1;
 				pData += length;
 				break;
 		}
