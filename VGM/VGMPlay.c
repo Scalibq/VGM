@@ -17,8 +17,8 @@
 #include "Endianness.h"
 
 //#define MPU401
-//#define IMFC
-#define SB
+#define IMFC
+//#define SB
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -144,45 +144,11 @@ void CloseMPU401(void)
 	reset_mpu(MPUReg[0]);
 }
 
-void InitIMFC(void)
+void InitIMFCAll()
 {
 	uint8_t c;
 	
-	// Initialize PIU
-	outp(IMFCReg[0] + PCR, PCR_INIT);
-	
-	// Write Interrupt Enable
-	outp(IMFCReg[0] + PCR, PCR_SET_WIE);
-	
-	// Music Card Message (1e5 - Reboot)
-	//WriteCommandToIMFC(IMFCReg[0], IMFC_REBOOT);
-	
-	// Music Card Message (1e0 - Set mode)
-	WriteCommandToIMFC(IMFCReg[0], IMFC_MODE);
-	
-	// Music Card Message (Set MUSIC mode)
-	//WriteCommandToIMFC(IMFCReg[0], 0x00);
-	
-	// Music Card Message (Set THRU mode)
-	WriteCommandToIMFC(IMFCReg[0], 0x01);
-
-	// Music Card Message (1e2 - Set Path Status Byte)
-	WriteCommandToIMFC(IMFCReg[0], IMFC_SET_PATH);
-	
-	// Music Card Message (Set Path MIDI IN > System, All blocked) 
-	WriteCommandToIMFC(IMFCReg[0], 0x00);
-	
-	// Music Card Message (Set Path System > MIDI OUT, Accept all MIDI messages)
-	WriteCommandToIMFC(IMFCReg[0], 0x7f);
-	
-	// Music Card Message (Set Path MIDI IN > SP, All Blocked)
-	WriteCommandToIMFC(IMFCReg[0], 0x00);
-	
-	// Music Card Message (Set Path System > SP, Accept all MIDI messages)
-	WriteCommandToIMFC(IMFCReg[0], 0x7f);
-	
-	// Music Card Message (Set Path MIDI IN > MIDI OUT, All Blocked)
-	WriteCommandToIMFC(IMFCReg[0], 0x00);
+	InitIMFC(IMFCReg[0], IMFC_MUSIC_MODE);
 	
 	// Turn all notes off
 	// For all channels
@@ -2600,7 +2566,7 @@ int main(int argc, char* argv[])
 #if defined(MPU401)
 	InitMPU401();
 #elif defined(IMFC)
-	InitIMFC();
+	InitIMFCAll();
 #elif defined(SB)
 	InitSB();
 #endif
