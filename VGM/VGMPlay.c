@@ -758,7 +758,7 @@ void PlayImmediate(const char* pVGMFile)
 	uint32_t delay;
 	uint16_t srcDelay;
 	VGM_HEADER header;
-	uint32_t idx;
+	uint32_t dataOffset;
 	uint32_t currentTime;
 	uint8_t i;
 	
@@ -783,11 +783,11 @@ void PlayImmediate(const char* pVGMFile)
 	printf("VGM Data Offset: %08X\n", header.lngDataOffset);
 
     if (header.lngDataOffset == 0)
-		idx = 0x40;
+		dataOffset = 0x40;
 	else
-		idx = header.lngDataOffset + 0x34;
+		dataOffset = header.lngDataOffset + 0x34;
 	
-	printf("VGM Data starts at %08X\n", idx);
+	printf("VGM Data starts at %08X\n", dataOffset);
 	
     // Can we play this on PCjr hardware?
     /*if (header.SN76489clock != 0)
@@ -800,7 +800,7 @@ void PlayImmediate(const char* pVGMFile)
 	}*/
 	
 	// Seek to VGM data
-	fseek(pFile, idx, SEEK_SET);
+	fseek(pFile, dataOffset, SEEK_SET);
 	
 	printf("Start playing VGM\n");
 	
@@ -1133,7 +1133,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	uint32_t delay;
 	uint16_t srcDelay;
 	VGM_HEADER header;
-	uint32_t idx, size;
+	uint32_t dataOffset, size;
 	uint16_t firstDelay;
 	uint16_t i, j;
 
@@ -1156,11 +1156,11 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	printf("VGM Data Offset: %08X\n", header.lngDataOffset);
 
     if (header.lngDataOffset == 0)
-		idx = 0x40;
+		dataOffset = 0x40;
 	else
-		idx = header.lngDataOffset + 0x34;
+		dataOffset = header.lngDataOffset + 0x34;
 	
-	printf("VGM Data starts at %08X\n", idx);
+	printf("VGM Data starts at %08X\n", dataOffset);
 	
     // Can we play this on PCjr hardware?
     /*if (header.SN76489clock != 0)
@@ -1173,7 +1173,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	}*/
 	
 	// Seek to VGM data
-	fseek(pFile, idx, SEEK_SET);
+	fseek(pFile, dataOffset, SEEK_SET);
 	
 	printf("Start preprocessing VGM\n");
 	
@@ -1190,19 +1190,19 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 
 	if (header.lngVersion >= 0x151)
 	{
-		if (header.lngDataOffset >= 0x54)
+		if (dataOffset >= 0x54)
 			preHeader.nrOfYM3812 = (header.lngHzYM3812 != 0) + ((header.lngHzYM3812 & 0x40000000L) != 0);
 		
-		if (header.lngDataOffset >= 0x60)
+		if (dataOffset >= 0x60)
 			preHeader.nrOfYMF262 = (header.lngHzYMF262 != 0) + ((header.lngHzYMF262 & 0x40000000L) != 0);
 
-		if (header.lngDataOffset >= 0x88)
+		if (dataOffset >= 0x88)
 			preHeader.nrOfAY8930 = (header.lngHzAY8910 != 0) + ((header.lngHzAY8910 & 0x40000000L) != 0);
 	}
 	
 	if (header.lngVersion >= 0x170)
 	{
-		if (header.lngDataOffset >= 0xCC)
+		if (dataOffset >= 0xCC)
 			preHeader.nrOfSAA1099 = (header.lngHzSAA1099 != 0) + ((header.lngHzSAA1099 & 0x40000000L) != 0);
 	}
 	
