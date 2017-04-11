@@ -8,9 +8,26 @@ include 8259A.inc
 BUFSIZE equ 32768
 NUMBUF equ 1
 
+PreHeader struc
+	marker 		db 4 dup(?)	; = {'P','r','e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
+	headerLen	dd ?		; = sizeof(_PreHeader); // Good MS-custom: always store the size of the header in your file, so you can add extra fields to the end later
+	_size		dd ?		; Amount of data after header
+	_loop		dd ?		; Offset in file to loop to
+	version		db ?		; Including a version number may be a good idea
+	nrOfSN76489	db ?
+	nrOfSAA1099	db ?
+	nrOfAY8930	db ?
+	nrOfYM3812	db ?
+	nrOfYMF262	db ?
+	nrOfMIDI	db ?
+PreHeader ends
+
 LOCALS @@
 
 .stack 100h
+
+.data?
+preHeader PreHeader <>
 
 .code
 start:
@@ -32,7 +49,6 @@ start:
 
 	; Retrieve filename from PSP
 getfname:
-	int 3
 	push es
 
     mov     ax, @data
@@ -102,6 +118,8 @@ getfname:
 	jmp err
 	
 fileOpen:
+	; Process header
+	call LoadHeader
 	
 	; Preprocess sample
 REPT NUMBUF
@@ -126,6 +144,25 @@ ENDM
 	
 	;call InitPCSpeaker
 	call InitPCjrAudio
+	
+	; Init OPL2
+	mov dx, 0388h
+	mov cx, 0F5h
+	; Set all registers to 0
+@@regLoop:
+	mov al, cl
+	out	dx, al
+rept 6
+    in      al,dx
+endm
+    inc     dx
+	xor ax, ax
+	out	dx, al
+rept 35
+    in      al,dx
+endm
+	dec dx
+	loop @@regLoop
 
 	; Install our own handler	
 	cli
@@ -341,6 +378,25 @@ err:
 	int 21h
 	
 ; === End program ===
+
+LoadHeader proc
+	; Read the header from file
+	mov ah, 03Fh
+	mov bx, cs:[file]
+	mov cx, size preHeader
+	mov dx, offset preHeader
+	int 21h
+	
+	; Search to start of data
+	mov ah, 042h
+	mov al, 00h	; Start of file
+	mov bx, cs:[file]
+	mov dx, word ptr [preHeader.headerLen]
+	mov cx, word ptr [preHeader.headerLen+2]
+	int 21h
+
+	ret
+LoadHeader endp
 	
 LoadBuffer proc
 	push ds
@@ -387,13 +443,32 @@ sampleBufIns:
 	push cx
 	xor cx, cx
 	mov cl, al
-		
+	
+	push dx
+	mov dx, 0388h
+	
+	jmp enterLoop
+	
 noteLoop:
+rept 35
+    in      al,dx
+endm
+	dec dx
+
+enterLoop:
 	segcs lodsb
-	out 0C0h, al
-		
+	out	dx,al
+rept 6
+    in      al,dx
+endm
+
+    inc     dx
+	segcs lodsb
+	out	dx,al
+
 	loop noteLoop
-		
+	
+	pop dx		
 	pop cx
 		
 endHandler:
