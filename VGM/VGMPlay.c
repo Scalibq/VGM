@@ -58,6 +58,7 @@ typedef struct _PreHeader
 	char marker[4];				// = {'P','r','e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
 	uint32_t headerLen;			// = sizeof(_PreHeader); // Good MS-custom: always store the size of the header in your file, so you can add extra fields to the end later
 	uint32_t size;				// Amount of data after header
+	uint32_t loop;				// Offset in file to loop to
 	uint8_t version;			// Including a version number may be a good idea
 	uint8_t nrOfSN76489;
 	uint8_t nrOfSAA1099;
@@ -1875,7 +1876,6 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	printf("Done preprocessing MIDI\n");
 }
 
-
 void SavePreprocessed(const char* pFileName)
 {
 	FILE* pFile = fopen(pFileName, "wb");
@@ -1907,6 +1907,9 @@ void LoadPreprocessed(const char* pFileName)
 	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
 	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
 	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
+	
+	// Search to start of data
+	fseek(pFile, preHeader.headerLen, SEEK_SET);
 
 	_farfread(pPreprocessed, preHeader.size, 1, pFile);
 	fclose(pFile);
