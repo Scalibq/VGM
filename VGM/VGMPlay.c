@@ -1471,12 +1471,11 @@ typedef struct
 {
 	uint8_t huge* pData;
 	uint8_t huge* pCur;
-	uint32_t length;
 	uint32_t delta;
 } MIDITrack;
 
-uint8_t nrOfTracks = 0;
-MIDITrack tracks[16];
+uint16_t nrOfTracks = 0;
+MIDITrack tracks[2048];
 uint8_t tracksStopped = 0;
 
 // Speed data
@@ -1654,6 +1653,11 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	// Process relevant data from header	
 	division = header.division;
 	nrOfTracks = header.ntrks;
+	if (nrOfTracks > _countof(tracks))
+	{
+		printf("Too many tracks: %u\nClamping to %u tracks", nrOfTracks, _countof(tracks));
+		nrOfTracks = _countof(tracks);
+	}
 	
 	// Calculate a default tempo, in case there is no specific Meta-Event
 	divisor = (tempo*(PITFREQ/1000000.0f))/division;
@@ -1677,11 +1681,9 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		printf("Track size: %lu\n", track.length);
 		
 		// Process releveant data from header
-		tracks[i].length = track.length;
-	
 		// Read into memory
-		tracks[i].pData = farmalloc(tracks[i].length);
-		_farfread(tracks[i].pData, tracks[i].length, 1, pFile);
+		tracks[i].pData = farmalloc(track.length);
+		_farfread(tracks[i].pData, track.length, 1, pFile);
 		tracks[i].pCur = tracks[i].pData;
 	}
 	
