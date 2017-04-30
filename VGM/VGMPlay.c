@@ -16,8 +16,8 @@
 #include "SB.h"
 #include "Endianness.h"
 
-//#define MPU401
-#define IMFC
+#define MPU401
+//#define IMFC
 //#define SB
 
 #define M_PI 3.1415926535897932384626433832795
@@ -1476,7 +1476,7 @@ typedef struct
 
 uint16_t nrOfTracks = 0;
 MIDITrack tracks[2048];
-uint8_t tracksStopped = 0;
+uint16_t tracksStopped = 0;
 
 // Speed data
 uint32_t tempo = 500000L;		// Microseconds per MIDI quarter-note, 24-bit value, default is 500000, which is 120 bpm
@@ -1720,8 +1720,9 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	while (playing && (tracksStopped < nrOfTracks))
 	{
 		uint32_t delta, delay, length;
-		uint8_t value, type, t;
-		uint8_t oldTracksStopped;
+		uint8_t value, type;
+		uint16_t t, oldTracksStopped;
+		
 		
 		// Detect if a track was stopped
 		oldTracksStopped = tracksStopped;
