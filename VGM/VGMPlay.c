@@ -16,8 +16,8 @@
 #include "SB.h"
 #include "Endianness.h"
 
-#define MPU401
-//#define IMFC
+//#define MPU401
+#define IMFC
 //#define SB
 
 #define M_PI 3.1415926535897932384626433832795
@@ -1080,11 +1080,25 @@ void OutputCommands(FILE* pOut)
 	
 	for (i = 0; i < preHeader.nrOfMIDI; i++)
 	{
+		uint8_t* pData = commands[i][MIDI] + 1;
+		
 		length = pCommands[i][MIDI] - commands[i][MIDI];
 		count = (length - 1);
 
-		if (count > 255)
-			printf("Too many MIDI commands: %u!\n", count);
+		while (count > 255)
+		{
+			uint16_t delay = 2;
+			
+			commands[i][MIDI][0] = 255;
+			fwrite(commands[i][MIDI], 1, 1, pOut);
+			fwrite(pData, 1, 255, pOut);
+			
+			count -= 255;
+			length -= 255;
+			pData += 255;
+			fwrite(&delay, sizeof(delay), 1, pOut);
+		}
+		
 		commands[i][MIDI][0] = count;
 		fwrite(commands[i][MIDI], length, 1, pOut);
 	}
@@ -1788,8 +1802,9 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				printf("SysEx F0, length: %lu\n", length);
 				
 				// Pre-pend 0xF0, it is implicit
-				_fmemcpy(pCommands[0][MIDI], pData-1, length+1);
-				pCommands[0][MIDI] += length + 1;
+				*pCommands[0][MIDI]++ = 0xF0;
+				_fmemcpy(pCommands[0][MIDI], pData, length);
+				pCommands[0][MIDI] += length;
 				pData += length;
 				break;
 			// Escaped SysEx
