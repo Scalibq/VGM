@@ -1737,7 +1737,6 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		uint8_t value, type;
 		uint16_t t, oldTracksStopped;
 		
-		
 		// Detect if a track was stopped
 		oldTracksStopped = tracksStopped;
 		
@@ -1759,7 +1758,10 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		
 		// Adjust all other tracks to the new delta
 		for (i = 0; i < nrOfTracks; i++)
-			tracks[i].delta -= delta;
+		{
+			if (tracks[i].delta < UINT32_MAX)
+				tracks[i].delta -= delta;
+		}
 		
 		delay = GETMIDIDELAY(delta);
 		
@@ -2607,10 +2609,10 @@ int main(int argc, char* argv[])
 	
 	InitKeyHandler();
 	
-	//PlayPoll1(argv[1]);
+	PlayPoll1(argv[1]);
 	//PlayPoll2(argv[1]);
 	//PlayPoll3(argv[1]);
-	PlayInt(argv[1]);
+	//PlayInt(argv[1]);
 	//PlayImmediate(argv[1]);
 	
 	DeinitKeyHandler();
