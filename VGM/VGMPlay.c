@@ -1812,33 +1812,35 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 			oldDelay += delay;
 		}
 		else
+		{
 			oldDelay = 0;
 		
-		// Break up into multiple delays with no notes
-		while (delay > minDelay)
-		{
-			if (delay >= 65536L)
+			// Break up into multiple delays with no notes
+			while (delay > 0)
 			{
-				firstDelay = 0;
-				delay -= 65536L;
-			}
-			else
-			{
-				firstDelay = delay;
-				delay = 0;
-			}
-		
-			// First write delay value
-			fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+				if (delay >= 65536L)
+				{
+					firstDelay = 0;
+					delay -= 65536L;
+				}
+				else
+				{
+					firstDelay = delay;
+					delay = 0;
+				}
 			
-			// Now output commands
-			OutputCommands(pOut);
-			
-			// Reset command buffers
-			// (Next delays will get 0 notes exported
-			for (i = 0; i < MAX_MULTICHIP; i++)
-				for (j = 0; j < NUM_CHIPS; j++)
-					pCommands[i][j] = commands[i][j] + 1;
+				// First write delay value
+				fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+				
+				// Now output commands
+				OutputCommands(pOut);
+				
+				// Reset command buffers
+				// (Next delays will get 0 notes exported
+				for (i = 0; i < MAX_MULTICHIP; i++)
+					for (j = 0; j < NUM_CHIPS; j++)
+						pCommands[i][j] = commands[i][j] + 1;
+			}
 		}
 	
 		// Get a MIDI command from the stream
