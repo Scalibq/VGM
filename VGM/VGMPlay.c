@@ -16,8 +16,8 @@
 #include "SB.h"
 #include "Endianness.h"
 
-//#define MPU401
-#define IMFC
+#define MPU401
+//#define IMFC
 //#define SB
 
 #define M_PI 3.1415926535897932384626433832795
@@ -1505,6 +1505,12 @@ float divisor = 0;		// Precalc this at every tempo-change
 //#define GETMIDIDELAY(x) ((uint32_t)((float)x*DIVISOR))
 #define GETMIDIDELAY(x) ((uint32_t)(x*divisor))
 
+// MIDI is sent at 31250 bits per second
+//in 8-N-1 format, so 1 start bit and 1 stop bit added, no parity, 10 bits total
+// Which is 31250 / 10 = 3125 bytes per second
+#define MIDI_BYTE_DURATION	(PITFREQ/3125)	// About 381 PIT ticks per MIDI byte
+#define EPSILON 381
+
 // Variable-length integers are maximum 0FFFFFFF, so 28-bit.
 /*
 void WriteVarLen(FILE* pFile, uint32_t value)
@@ -1733,7 +1739,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	
 	while (playing && (tracksStopped < nrOfTracks))
 	{
-		uint32_t delta, delay, length;
+		uint32_t delta, delay, minDelay, length;
 		uint8_t value, type;
 		uint16_t t, oldTracksStopped;
 		
@@ -1765,8 +1771,15 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		
 		delay = GETMIDIDELAY(delta);
 		
+		length = pCommands[0][MIDI] - commands[0][MIDI];
+		minDelay = MIDI_BYTE_DURATION*length;
+		
+		// Calculate PIT ticks required for data so far*
+		if ((delay > 0) && (delay < minDelay))
+			printf("Very small delay detected: %d!\n", delay);
+		
 		// Break up into multiple delays with no notes
-		while (delay > 1)
+		while (delay > minDelay)
 		{
 			if (delay >= 65536L)
 			{
@@ -1804,7 +1817,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				printf("SysEx F0, length: %lu\n", length);
 				
 				// Pre-pend 0xF0, it is implicit
-				*pCommands[0][MIDI]++ = 0xF0;
+				*pCommands[0][MIDI]++ = value;
 				_fmemcpy(pCommands[0][MIDI], pData, length);
 				pCommands[0][MIDI] += length;
 				pData += length;
@@ -2609,10 +2622,10 @@ int main(int argc, char* argv[])
 	
 	InitKeyHandler();
 	
-	PlayPoll1(argv[1]);
+	//PlayPoll1(argv[1]);
 	//PlayPoll2(argv[1]);
 	//PlayPoll3(argv[1]);
-	//PlayInt(argv[1]);
+	PlayInt(argv[1]);
 	//PlayImmediate(argv[1]);
 	
 	DeinitKeyHandler();
