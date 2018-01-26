@@ -1798,18 +1798,8 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		
 		length = pCommands[0][MIDI] - commands[0][MIDI];
 		
-		// Avoid extreme delays
-		if (length < 200)
-		{
-			// Calculate PIT ticks required for data so far
-			minDelay = MIDI_BYTE_DURATION*length;
-		}
-		else
-		{
-			minDelay = 0;
-			
-			printf("Extreme delay! Flushed!\n");
-		}		
+		// Calculate PIT ticks required for data so far
+		minDelay = MIDI_BYTE_DURATION*length;
 		
 		// Is the delay smaller than the time required to send the notes?
 		// Then skip the delay here, concatenate data to previous event, and
@@ -1826,8 +1816,10 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 			oldDelay = 0;
 		
 			// Break up into multiple delays with no notes
-			while (delay > minDelay)
+			while (delay > 0)
 			{
+				uint32_t tempDelay;
+				
 				if (delay >= 65536L)
 				{
 					firstDelay = 0;
@@ -1838,6 +1830,11 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 					firstDelay = delay;
 					delay = 0;
 				}
+				
+				tempDelay = firstDelay == 0 ? 65536L : firstDelay;
+				
+				if (tempDelay < minDelay)
+					printf("Problem: takes longer to write commands than max interrupt interval!\n");
 			
 				// First write delay value
 				fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
@@ -1850,6 +1847,8 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				for (i = 0; i < MAX_MULTICHIP; i++)
 					for (j = 0; j < NUM_CHIPS; j++)
 						pCommands[i][j] = commands[i][j] + 1;
+					
+				minDelay = 0;
 			}
 		}
 	
