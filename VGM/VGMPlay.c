@@ -1772,9 +1772,13 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		delay = GETMIDIDELAY(delta) + oldDelay;
 		
 		length = pCommands[0][MIDI] - commands[0][MIDI];
+
+		// Calculate PIT ticks required for data so far
 		minDelay = MIDI_BYTE_DURATION*length;
 		
-		// Calculate PIT ticks required for data so far
+		// Is the delay smaller than the time required to send the notes?
+		// Then skip the delay here, concatenate data to previous event, and
+		// fix the total delay later
 		if (delay <= minDelay)
 		{
 			if (delay > 0)
