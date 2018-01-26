@@ -1826,7 +1826,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 			oldDelay = 0;
 		
 			// Break up into multiple delays with no notes
-			while (delay > 0)
+			while (delay > minDelay)
 			{
 				if (delay >= 65536L)
 				{
