@@ -1807,7 +1807,8 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		if (delay <= minDelay)
 		{
 			if (delay > 0)
-				printf("Very small delay detected: %d!\n", delay);
+				printf("Very small delay detected: %lu!\n", delay);
+			
 			oldDelay += delay;
 		}
 		else
