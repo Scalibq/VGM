@@ -16,8 +16,8 @@
 #include "SB.h"
 #include "Endianness.h"
 
-#define MPU401
-//#define IMFC
+//#define MPU401
+#define IMFC
 //#define SB
 
 #define M_PI 3.1415926535897932384626433832795
@@ -194,7 +194,7 @@ void CloseIMFC(void)
 	OutputMIDI(IMFCReg[0], GMReset, _countof(GMReset));
 	
 	// Music Card Message (1e5 - Reboot)
-	WriteCommandToIMFC(IMFCReg[0], 0xe5);
+	//WriteCommandToIMFC(IMFCReg[0], 0xe5);
 }
 
 void InitSB(void)
