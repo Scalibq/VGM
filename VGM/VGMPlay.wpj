@@ -4,10 +4,10 @@ projectIdent
 VpeMain
 1
 WRect
-0
-0
-7661
-9120
+1772
+355
+7660
+9116
 2
 MProject
 3
@@ -30,8 +30,8 @@ VComponent
 WRect
 0
 0
-5674
-4213
+5672
+4209
 0
 0
 9
@@ -39,5 +39,5 @@ WFileName
 11
 VGMPlay.tgt
 0
-0
+18
 7

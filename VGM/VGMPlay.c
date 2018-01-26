@@ -14,11 +14,13 @@
 #include "MPU401.h"
 #include "IMFC.h"
 #include "SB.h"
+#include "DBS2P.h"
 #include "Endianness.h"
 
 //#define MPU401
-#define IMFC
+//#define IMFC
 //#define SB
+#define DBS2P
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -96,6 +98,8 @@ void OutputMIDI(uint16_t base, uint8_t huge* pBuf, uint16_t len)
 #elif defined(SB)
 		WriteDSP(base, 0x38);
 		WriteDSP(base, pBuf[i]);
+#elif defined(DBS2P)
+		WriteDBS2PData(base, pBuf[i]);
 #endif
 	}
 }
@@ -243,6 +247,25 @@ void CloseSB(void)
 	OutputMIDI(SBReg[0], GMReset, _countof(GMReset));
 	
 	ResetDSP(SBReg[0]);
+}
+
+void InitDBS2P(uint16_t base)
+{
+	uint8_t i, val;
+	volatile uint8_t delay;
+	
+	// Enable parallel mode
+	WriteDBS2PCtrl(base, 0x3F);
+	
+	// Discard reply byte
+	delay = ReadDBS2PData(base);
+
+	OutputMIDI(base, GMReset, _countof(GMReset));
+}
+
+void CloseDBS2P(uint16_t base)
+{
+	// ??
 }
 
 void InitPCjrAudio(void)
@@ -567,6 +590,8 @@ void PlayData(void)
 		OutputMIDI(IMFCReg[i], pBuf, count);
 #elif defined(SB)
 		OutputMIDI(SBReg[i], pBuf, count);
+#elif defined(DBS2P)
+		OutputMIDI(0x378, pBuf, count);
 #endif
 
 		pBuf += count;
@@ -2615,6 +2640,8 @@ int main(int argc, char* argv[])
 	InitIMFCAll();
 #elif defined(SB)
 	InitSB();
+#elif defined(DBS2P)
+	InitDBS2P(0x378);
 #endif
 
 	// Set up channels to play samples, by setting frequency 0
@@ -2661,6 +2688,8 @@ int main(int argc, char* argv[])
 	CloseIMFC();
 #elif defined(SB)
 	CloseSB();
+#elif defined(DBS2P)
+	CloseDBS2P(0x378);
 #endif
 
 	return 0;
