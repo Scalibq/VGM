@@ -1739,7 +1739,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	
 	while (playing && (tracksStopped < nrOfTracks))
 	{
-		uint32_t delta, delay, minDelay, length;
+		uint32_t delta, delay, minDelay, length, oldDelay = 0;
 		uint8_t value, type;
 		uint16_t t, oldTracksStopped;
 		
@@ -1769,14 +1769,20 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				tracks[i].delta -= delta;
 		}
 		
-		delay = GETMIDIDELAY(delta);
+		delay = GETMIDIDELAY(delta) + oldDelay;
 		
 		length = pCommands[0][MIDI] - commands[0][MIDI];
 		minDelay = MIDI_BYTE_DURATION*length;
 		
-		// Calculate PIT ticks required for data so far*
-		if ((delay > 0) && (delay < minDelay))
-			printf("Very small delay detected: %d!\n", delay);
+		// Calculate PIT ticks required for data so far
+		if (delay <= minDelay)
+		{
+			if (delay > 0)
+				printf("Very small delay detected: %d!\n", delay);
+			oldDelay += delay;
+		}
+		else
+			oldDelay = 0;
 		
 		// Break up into multiple delays with no notes
 		while (delay > minDelay)
