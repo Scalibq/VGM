@@ -1511,6 +1511,8 @@ typedef struct
 	uint8_t huge* pData;
 	uint8_t huge* pCur;
 	uint32_t delta;
+	uint8_t runningStatus;
+	uint16_t lastLength;
 } MIDITrack;
 
 uint16_t nrOfTracks = 0;
@@ -1659,7 +1661,6 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 {
 	MIDIHeader header;
 	MIDIChunk track;
-	uint16_t lastLength;
 	uint16_t i, j;
 	uint8_t huge* pData;
 	uint16_t firstDelay;
@@ -1888,7 +1889,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 			default:
 				// Not a status byte, use running-status
 				if (value < 0x80)
-					length = lastLength;
+					length = tracks[t].lastLength;
 				else
 				{
 					type = value & 0xF0;
@@ -1912,7 +1913,8 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 					
 					// Store data for running-status mode
 					// Length will be 1 shorter, because the status byte will be omitted
-					lastLength = length - 1;
+					tracks[t].lastLength = length - 1;
+					tracks[t].runningStatus = value;					
 				}
 					
 				// Send first byte as well
