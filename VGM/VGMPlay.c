@@ -1889,7 +1889,11 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 			default:
 				// Not a status byte, use running-status
 				if (value < 0x80)
-					length = tracks[t].lastLength;
+				{
+					pData--;
+					pData[-1] = tracks[t].runningStatus;
+					length = tracks[t].lastLength + 1;
+				}
 				else
 				{
 					type = value & 0xF0;
