@@ -1885,6 +1885,40 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				pData = DoMetaEvent(pData);
 				break;
 				
+			// System messages (resest running status)
+			case 0xF1:
+				// Time code quarter frame (0nnndddd)
+				pData++;
+				break;
+			case 0xF2:
+				// Song position pointer
+				pData += 2;
+				break;
+			case 0xF3:
+				// Song select
+				pData++;;
+				break;
+			case 0xF6:
+				// Tune request (single byte)
+				*pCommands[0][MIDI]++ = value;
+				break;
+			// Real-time messages (do not participate in running status)
+			case 0xF8:
+			case 0xF9:
+			case 0xFA:
+			case 0xFB:
+			case 0xFC:
+			case 0xFD:
+			case 0xFE:
+				// Just a single byte, should never occur in a MIDI file?
+				*pCommands[0][MIDI]++ = value;
+				break;
+
+			// Reserved
+			case 0xF4:
+			case 0xF5:
+				break;
+
 			// Regular MIDI channel message
 			default:
 				// Not a status byte, use running-status
@@ -1900,10 +1934,6 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 					
 					switch (type)
 					{
-						// System message?
-						case SYSTEM:
-							length = 0;
-							break;
 						// Single-byte message?
 						case PC:
 						case CHANNEL_AFTERTOUCH:
