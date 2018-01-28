@@ -17,8 +17,8 @@
 #include "DBS2P.h"
 #include "Endianness.h"
 
-#define MPU401
-//#define IMFC
+//#define MPU401
+#define IMFC
 //#define SB
 //#define DBS2P
 
@@ -1536,6 +1536,7 @@ float divisor = 0;		// Precalc this at every tempo-change
 //in 8-N-1 format, so 1 start bit and 1 stop bit added, no parity, 10 bits total
 // Which is 31250 / 10 = 3125 bytes per second
 #define MIDI_BYTE_DURATION	(PITFREQ/3125)	// About 381 PIT ticks per MIDI byte
+#define INT_OVERHEAD (100)
 #define EPSILON 381
 
 // Variable-length integers are maximum 0FFFFFFF, so 28-bit.
@@ -1807,7 +1808,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		length = pCommands[0][MIDI] - commands[0][MIDI];
 		
 		// Calculate PIT ticks required for data so far
-		minDelay = MIDI_BYTE_DURATION*length;
+		minDelay = INT_OVERHEAD + (MIDI_BYTE_DURATION*length);
 		
 		// Is the delay smaller than the time required to send the notes?
 		// Then skip the delay here, concatenate data to previous event, and
@@ -1865,8 +1866,9 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		
 		switch (value)
 		{
-			// Regular SysEx
+			// Regular SysEx (resets running status)
 			case 0xF0:
+				lastStatus = 0;
 				pData = ReadVarLen(pData, &length);
 				
 				printf("SysEx F0, length: %lu\n", length);
@@ -1877,8 +1879,9 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				pCommands[0][MIDI] += length;
 				pData += length;
 				break;
-			// Escaped SysEx
+			// Escaped SysEx (resets running status)
 			case 0xF7:
+				lastStatus = 0;
 				pData = ReadVarLen(pData, &length);
 				
 				printf("SysEx F7, length: %lu\n", length);
@@ -1887,26 +1890,31 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				pCommands[0][MIDI] += length;
 				pData += length;
 				break;
-			// Meta event
+			// Meta event (resets running status)
 			case 0xFF:
+				lastStatus = 0;
 				pData = DoMetaEvent(pData);
 				break;
 				
-			// System messages (resest running status)
+			// System messages (resets running status)
 			case 0xF1:
 				// Time code quarter frame (0nnndddd)
+				lastStatus = 0;
 				pData++;
 				break;
 			case 0xF2:
 				// Song position pointer
+				lastStatus = 0;
 				pData += 2;
 				break;
 			case 0xF3:
 				// Song select
-				pData++;;
+				lastStatus = 0;
+				pData++;
 				break;
 			case 0xF6:
 				// Tune request (single byte)
+				lastStatus = 0;
 				*pCommands[0][MIDI]++ = value;
 				break;
 			// Real-time messages (do not participate in running status)
@@ -1921,9 +1929,10 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				*pCommands[0][MIDI]++ = value;
 				break;
 
-			// Reserved
+			// Reserved (resets running status)
 			case 0xF4:
 			case 0xF5:
+				lastStatus = 0;
 				break;
 
 			// Regular MIDI channel message
