@@ -17,10 +17,10 @@
 #include "DBS2P.h"
 #include "Endianness.h"
 
-//#define MPU401
+#define MPU401
 //#define IMFC
 //#define SB
-#define DBS2P
+//#define DBS2P
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -1661,11 +1661,12 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 {
 	MIDIHeader header;
 	MIDIChunk track;
-	uint16_t i, j;
+	uint16_t i, j, t = UINT32_MAX;
 	uint8_t huge* pData;
 	uint16_t firstDelay;
-	uint32_t size;
+	uint32_t size, oldDelay = 0;
 	FILE* pOut;
+	uint8_t lastStatus = 0;
 	
 	fread(&header, sizeof(header), 1, pFile);
 	
@@ -1765,15 +1766,16 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	
 	while (playing && (tracksStopped < nrOfTracks))
 	{
-		uint32_t delta, delay, minDelay, length, oldDelay = 0;
+		uint32_t delta, delay, minDelay, length;
 		uint8_t value, type;
-		uint16_t t, oldTracksStopped;
+		uint16_t oldT, oldTracksStopped;
 		
 		// Detect if a track was stopped
 		oldTracksStopped = tracksStopped;
 		
 		// Select the track with the next event
-		delta = UINT32_MAX;
+		delta = UINT32_MAX - 1;
+		oldT = t;
 		t = 0;
 		
 		for (i = 0; i < nrOfTracks; i++)
@@ -1782,6 +1784,11 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 			{
 				t = i;
 				delta = tracks[i].delta;
+			}
+			else if ((delta == tracks[i].delta) && (oldT == i))
+			{
+				// Prefer same track as previous, for possible running status
+				t = i;
 			}
 		}
 		
@@ -1951,9 +1958,20 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 					tracks[t].runningStatus = value;					
 				}
 					
-				// Send first byte as well
-				_fmemcpy(pCommands[0][MIDI], pData-1, length+1);
-				pCommands[0][MIDI] += length + 1;
+				// See if we can perform a new running status
+				if (lastStatus == pData[-1])
+				{
+					// Skip first byte, as it's the same as before
+					_fmemcpy(pCommands[0][MIDI], pData, length);
+					pCommands[0][MIDI] += length;
+				}
+				else
+				{
+					// Send first byte as well
+					_fmemcpy(pCommands[0][MIDI], pData-1, length+1);
+					pCommands[0][MIDI] += length + 1;
+				}
+				lastStatus = pData[-1];
 				pData += length;
 				break;
 		}
