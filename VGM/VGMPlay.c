@@ -1957,7 +1957,14 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 					tracks[t].lastLength = length - 1;
 					tracks[t].runningStatus = value;					
 				}
-					
+
+				// Replace NOTE OFF messages with NOTE ON with velocity 0
+				if ((pData[-1] & 0xF0) == NOTE_OFF)
+				{
+					pData[-1] = (pData[-1] & 0x0F) | NOTE_ON;
+					pData[1] = 0;
+				}
+				
 				// See if we can perform a new running status
 				if (lastStatus == pData[-1])
 				{
