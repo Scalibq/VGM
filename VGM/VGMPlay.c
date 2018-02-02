@@ -516,7 +516,8 @@ uint8_t huge* pEndBuf;
 void PlayData(void)
 {
 	uint8_t count;
-	uint16_t i;
+	uint16_t i, j;
+	volatile uint8_t delay;
 	
 	// Get note data
 	for (i = 0; i < preHeader.nrOfSN76489; i++)
@@ -555,7 +556,11 @@ void PlayData(void)
 		while (count--)
 		{
 			outp(OPL2Reg[i], *pBuf++);
+			for (j = 0; j < 6; j++)
+				delay = inp(OPL2Reg[i]);
 			outp(OPL2Reg[i]+1, *pBuf++);
+			for (j = 0; j < 35; j++)
+				delay = inp(OPL2Reg[i]);
 		}
 	}
 		
@@ -567,7 +572,11 @@ void PlayData(void)
 		while (count--)
 		{
 			outp(OPL3Reg[i*2], *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(OPL3Reg[i*2]);
 			outp(OPL3Reg[i*2]+1, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(OPL3Reg[i*2]);
 		}
 
 		// Then port 1 commands
@@ -576,7 +585,11 @@ void PlayData(void)
 		while (count--)
 		{
 			outp(OPL3Reg[i*2 + 1], *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(OPL3Reg[i*2 + 1]);
 			outp(OPL3Reg[i*2 + 1]+1, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(OPL3Reg[i*2 + 1]);
 		}
 	}
 	
