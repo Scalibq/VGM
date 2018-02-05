@@ -2108,7 +2108,6 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 	while (lengthPairs < header.commands)
 	{
 		uint8_t data[2];
-		bool flush = 0;
 		
 		fread(data, sizeof(data), 1, pFile);
 		
@@ -2128,7 +2127,6 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 		else
 		{
 			uint8_t chip = 0;
-			uint16_t length, count;
 			
 			// Write delays first
 			// Break up into multiple delays with no notes
@@ -2180,23 +2178,11 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 				{
 					*pCommands[0][YMF262PORT0]++ = conversionTable[data[0]];
 					*pCommands[0][YMF262PORT0]++ = data[1];
-					
-					length = pCommands[0][YMF262PORT0] - commands[0][YMF262PORT0];
-					count = (length - 1) / 2;
-					
-					if (count >= 255)
-						flush = 1;
 				}
 				else
 				{
 					*pCommands[0][YMF262PORT1]++ = conversionTable[data[0]];
 					*pCommands[0][YMF262PORT1]++ = data[1];
-					
-					length = pCommands[0][YMF262PORT1] - commands[0][YMF262PORT1];
-					count = (length - 1) / 2;
-
-					if (count >= 255)
-						flush = 1;
 				}
 			}
 			else
@@ -2204,32 +2190,6 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 				// OPL2
 				*pCommands[chip][YM3812]++ = conversionTable[data[0]];
 				*pCommands[chip][YM3812]++ = data[1];
-				
-				length = pCommands[chip][YM3812] - commands[chip][YM3812];
-				count = (length - 1) / 2;
-
-				if (count >= 255)
-					flush = 1;
-			}
-			
-			if (flush)
-			{
-				printf("Flush!\n");
-				
-				// Flush if we have to many commands
-				firstDelay = 1;
-
-				// First write delay value
-				fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-					
-				// Now output commands
-				OutputCommands(pOut);
-				
-				// Reset command buffers
-				// (Next delays will get 0 notes exported
-				for (i = 0; i < MAX_MULTICHIP; i++)
-					for (j = 0; j < NUM_CHIPS; j++)
-						pCommands[i][j] = commands[i][j] + 1;
 			}
 		}
 		
