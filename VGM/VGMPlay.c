@@ -19,7 +19,7 @@
 #include "Endianness.h"
 
 //#define MPU401
-#define IMFC
+//#define IMFC
 #define SB
 //#define DBS2P
 
@@ -1560,6 +1560,8 @@ float divisor = 0;		// Precalc this at every tempo-change
 #define INT_OVERHEAD (100)
 #define EPSILON 381
 
+#define	ADLIB_BYTE_DURATION	(250)
+
 // Variable-length integers are maximum 0FFFFFFF, so 28-bit.
 /*
 void WriteVarLen(FILE* pFile, uint32_t value)
@@ -2107,6 +2109,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 	// Process all register/data pairs in the file
 	while (lengthPairs < header.commands)
 	{
+		uint32_t minDelay, length;
 		uint8_t data[2];
 		
 		fread(data, sizeof(data), 1, pFile);
@@ -2135,33 +2138,47 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 			{
 				// Convert to PIT ticks
 				delay = totalDelay*(PITFREQ/1000.0);
-				totalDelay = 0;
-			}
-			
-			while (delay > 0)
-			{
-				if (delay >= 65536L)
+				
+				length = pCommands[0][YM3812] - commands[0][YM3812];
+		
+				// Calculate PIT ticks required for data so far
+				minDelay = INT_OVERHEAD + (ADLIB_BYTE_DURATION*length);
+				
+				if (delay <= minDelay)
 				{
-					firstDelay = 0;
-					delay -= 65536L;
+					if (delay > 0)
+						printf("Very small delay detected: %lu!\n", delay);
 				}
 				else
 				{
-					firstDelay = delay;
-					delay = 0;
+					totalDelay =0;
+					
+					while (delay > 0)
+					{
+						if (delay >= 65536L)
+						{
+							firstDelay = 0;
+							delay -= 65536L;
+						}
+						else
+						{
+							firstDelay = delay;
+							delay = 0;
+						}
+						
+						// First write delay value
+						fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+						
+						// Now output commands
+						OutputCommands(pOut);
+						
+						// Reset command buffers
+						// (Next delays will get 0 notes exported
+						for (i = 0; i < MAX_MULTICHIP; i++)
+							for (j = 0; j < NUM_CHIPS; j++)
+								pCommands[i][j] = commands[i][j] + 1;
+					}
 				}
-				
-				// First write delay value
-				fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-				
-				// Now output commands
-				OutputCommands(pOut);
-				
-				// Reset command buffers
-				// (Next delays will get 0 notes exported
-				for (i = 0; i < MAX_MULTICHIP; i++)
-					for (j = 0; j < NUM_CHIPS; j++)
-						pCommands[i][j] = commands[i][j] + 1;
 			}
 			
 			// Normal register/data pair
