@@ -2105,7 +2105,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 	printf("Start preprocessing DRO\n");
 
 	// Process all register/data pairs in the file
-	while (!feof(pFile))//(lengthPairs < header.commands)
+	while (lengthPairs < header.commands)
 	{
 		uint8_t data[2];
 		bool flush = 0;
@@ -2117,13 +2117,13 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 		{
 			// Delay 1-256 ms
 			// Accumulate delays until next command
-			totalDelay += (uint32_t)data[1] + 1;
+			totalDelay += data[1] + 1L;
 		}
 		else if (data[0] == header.delayShift8)
 		{
 			// Delay (1-256) << 8 ms
 			// Accumulate delays until next command
-			totalDelay += ((uint32_t)data[1] + 1) << 8;
+			totalDelay += (data[1] + 1L) << 8;
 		}
 		else
 		{
