@@ -35,6 +35,15 @@
 #define GETDELAY(n)	((uint32_t)(n*(uint32_t)DIVISOR) >> DIVISOR_SHIFT)
 //#define GETDELAY(n)	((uint32_t)(((n*(1193182.0/44100.0))+0.5)))
 
+// MIDI is sent at 31250 bits per second
+//in 8-N-1 format, so 1 start bit and 1 stop bit added, no parity, 10 bits total
+// Which is 31250 / 10 = 3125 bytes per second
+#define MIDI_BYTE_DURATION	(PITFREQ/3125)	// About 381 PIT ticks per MIDI byte
+#define INT_OVERHEAD (100)
+#define EPSILON 381
+
+#define	ADLIB_BYTE_DURATION	(250)
+
 // Index for each sound chip in a command stream
 #define SN76489 0
 #define SAA1099 1
@@ -1191,7 +1200,7 @@ FileType GetFileType(FILE* pFile)
 void PreProcessVGM(FILE* pFile, const char* pOutFile)
 {
 	FILE* pOut;
-	uint32_t delay;
+	uint32_t delay = 0, minDelay, length;
 	uint16_t srcDelay;
 	VGM_HEADER header;
 	uint32_t dataOffset, size;
@@ -1267,7 +1276,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 			preHeader.nrOfSAA1099 = (header.lngHzSAA1099 != 0) + ((header.lngHzSAA1099 & 0x40000000L) != 0);
 	}
 	
-	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
+	printf("# SN76489: %u\n", preHeader.nrOfSN76489);
 	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
 	printf("# AY8930: %u\n", preHeader.nrOfAY8930);
 	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
@@ -1281,7 +1290,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	for (i = 0; i < MAX_MULTICHIP; i++)
 		for (j = 0; j < NUM_CHIPS; j++)
 			pCommands[i][j] = commands[i][j] + 1;
-	
+		
 	while (playing)
 	{
 		uint8_t value = fgetc(pFile);
@@ -1300,83 +1309,83 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 
 					// For small values, use a quick table lookup
 					if (srcDelay < _countof(delayTable))
-						delay = delayTable[srcDelay];
+						delay += delayTable[srcDelay];
 					else
-						delay = GETDELAY(srcDelay);
+						delay += GETDELAY(srcDelay);
 					
 					goto endDelay;
 					break;
 				}
 			case 0x62:	// wait 1/60th second: 735 samples
-				delay = GETDELAY(735);
+				delay += GETDELAY(735);
 				goto endDelay;
 				break;
 			case 0x63:	// wait 1/50th second: 882 samples
-				delay = GETDELAY(882);
+				delay += GETDELAY(882);
 				goto endDelay;
 				break;
 			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(1);
+				delay += GETDELAY(1);
 				goto endDelay;
 				break;
 			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(2);
+				delay += GETDELAY(2);
 				goto endDelay;
 				break;
 			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(3);
+				delay += GETDELAY(3);
 				goto endDelay;
 				break;
 			case 0x73:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(4);
+				delay += GETDELAY(4);
 				goto endDelay;
 				break;
 			case 0x74:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(5);
+				delay += GETDELAY(5);
 				goto endDelay;
 				break;
 			case 0x75:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(6);
+				delay += GETDELAY(6);
 				goto endDelay;
 				break;
 			case 0x76:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(7);
+				delay += GETDELAY(7);
 				goto endDelay;
 				break;
 			case 0x77:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(8);
+				delay += GETDELAY(8);
 				goto endDelay;
 				break;
 			case 0x78:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(9);
+				delay += GETDELAY(9);
 				goto endDelay;
 				break;
 			case 0x79:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(10);
+				delay += GETDELAY(10);
 				goto endDelay;
 				break;
 			case 0x7A:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(11);
+				delay += GETDELAY(11);
 				goto endDelay;
 				break;
 			case 0x7B:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(12);
+				delay += GETDELAY(12);
 				goto endDelay;
 				break;
 			case 0x7C:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(13);
+				delay += GETDELAY(13);
 				goto endDelay;
 				break;
 			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(14);
+				delay += GETDELAY(14);
 				goto endDelay;
 				break;
 			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(15);
+				delay += GETDELAY(15);
 				goto endDelay;
 				break;
 			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
-				delay = GETDELAY(16);
+				delay += GETDELAY(16);
 				goto endDelay;
 				break;
 
@@ -1476,31 +1485,45 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 			continue;
 		}*/
 		
-		// Break up into multiple delays with no notes
-		while (delay > 1)
-		{
-			if (delay >= 65536L)
-			{
-				firstDelay = 0;
-				delay -= 65536L;
-			}
-			else
-			{
-				firstDelay = delay;
-				delay = 0;
-			}
+		length = pCommands[0][YM3812] - commands[0][YM3812];
+
+		// Calculate PIT ticks required for data so far
+		minDelay = INT_OVERHEAD + (ADLIB_BYTE_DURATION*length);
 		
-			// First write delay value
-			fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+		if (delay <= minDelay)
+		{
+			if (delay > 0)
+				printf("Very small delay detected: %lu!\n", delay);
+		}
+		else
+		{
 			
-			// Now output commands
-			OutputCommands(pOut);
+			// Break up into multiple delays with no notes
+			while (delay > 0)
+			{
+				if (delay >= 65536L)
+				{
+					firstDelay = 0;
+					delay -= 65536L;
+				}
+				else
+				{
+					firstDelay = delay;
+					delay = 0;
+				}
 			
-			// Reset command buffers
-			// (Next delays will get 0 notes exported
-			for (i = 0; i < MAX_MULTICHIP; i++)
-				for (j = 0; j < NUM_CHIPS; j++)
-					pCommands[i][j] = commands[i][j] + 1;
+				// First write delay value
+				fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+				
+				// Now output commands
+				OutputCommands(pOut);
+				
+				// Reset command buffers
+				// (Next delays will get 0 notes exported
+				for (i = 0; i < MAX_MULTICHIP; i++)
+					for (j = 0; j < NUM_CHIPS; j++)
+						pCommands[i][j] = commands[i][j] + 1;
+			}
 		}
 	}
 	
@@ -1552,15 +1575,6 @@ float divisor = 0;		// Precalc this at every tempo-change
 //#define DIVISOR	(MICROSEC_PER_TICK*(PITFREQ/1000000.0f))
 //#define GETMIDIDELAY(x) ((uint32_t)((float)x*DIVISOR))
 #define GETMIDIDELAY(x) ((uint32_t)(x*divisor))
-
-// MIDI is sent at 31250 bits per second
-//in 8-N-1 format, so 1 start bit and 1 stop bit added, no parity, 10 bits total
-// Which is 31250 / 10 = 3125 bytes per second
-#define MIDI_BYTE_DURATION	(PITFREQ/3125)	// About 381 PIT ticks per MIDI byte
-#define INT_OVERHEAD (100)
-#define EPSILON 381
-
-#define	ADLIB_BYTE_DURATION	(250)
 
 // Variable-length integers are maximum 0FFFFFFF, so 28-bit.
 /*
@@ -1771,7 +1785,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 
 	preHeader.nrOfMIDI = 1;
 	
-	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
+	printf("# SN76489: %u\n", preHeader.nrOfSN76489);
 	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
 	printf("# AY8930: %u\n", preHeader.nrOfAY8930);
 	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
@@ -2089,7 +2103,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 	
 	pOut = fopen(pOutFile, "wb");
 
-	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
+	printf("# SN76489: %u\n", preHeader.nrOfSN76489);
 	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
 	printf("# AY8930: %u\n", preHeader.nrOfAY8930);
 	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
@@ -2261,7 +2275,7 @@ void LoadPreprocessed(const char* pFileName)
 	
 	printf("Preprocessed size: %lu\n", preHeader.size);
 	
-	printf("# SN76479: %u\n", preHeader.nrOfSN76489);
+	printf("# SN76489: %u\n", preHeader.nrOfSN76489);
 	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
 	printf("# AY8930: %u\n", preHeader.nrOfAY8930);
 	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
