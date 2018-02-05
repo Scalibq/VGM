@@ -11,6 +11,7 @@
 #include "stdtype.h"	// VGMFile.h uses nonstandard types, define them separately
 #include "VGMFile.h"
 #include "MIDI.h"
+#include "DRO.h"
 #include "MPU401.h"
 #include "IMFC.h"
 #include "SB.h"
@@ -19,7 +20,7 @@
 
 //#define MPU401
 #define IMFC
-//#define SB
+#define SB
 //#define DBS2P
 
 #define M_PI 3.1415926535897932384626433832795
@@ -1147,7 +1148,8 @@ typedef enum
 	FT_Unknown,
 	FT_VGMFile,
 	FT_MIDIFile,
-	FT_PreFile
+	FT_PreFile,
+	FT_DROFile
 } FileType;
 
 FileType GetFileType(FILE* pFile)
@@ -1155,6 +1157,7 @@ FileType GetFileType(FILE* pFile)
 	VGM_HEADER* pVGMHeader;
 	PreHeader* pPreHeader;
 	MIDIHeader* pMIDIHeader;
+	DROHeader* pDROHeader;
 	
 	uint8_t data[16];
 	
@@ -1176,6 +1179,11 @@ FileType GetFileType(FILE* pFile)
 	pPreHeader = (PreHeader*)data;
 	if (memcmp(pPreHeader->marker, "PreV", 4) == 0)
 		return FT_PreFile;
+	
+	// Try DRO
+	pDROHeader = (DROHeader*)data;
+	if (memcmp(pDROHeader->id, "DBRAWOPL", 8) == 0)
+		return FT_DROFile;
 	
 	return FT_Unknown;
 }
@@ -2039,6 +2047,11 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	printf("Done preprocessing MIDI\n");
 }
 
+void PreProcessDRO(FILE* pFile, const char* pOutFile)
+{
+	
+}
+
 void SavePreprocessed(const char* pFileName)
 {
 	FILE* pFile = fopen(pFileName, "wb");
@@ -2501,6 +2514,11 @@ void PlayPoll1(const char* pVGMFile)
 			fclose(pFile);
 			LoadPreprocessed(pVGMFile);
 			break;
+		case FT_DROFile:
+			PreProcessDRO(pFile, "out.pre");
+			fclose(pFile);
+			LoadPreprocessed("out.pre");
+			break;
 		default:
 			fclose(pFile);
 			printf("Unsupported file!\n");
@@ -2543,6 +2561,11 @@ void PlayPoll2(const char* pVGMFile)
 		case FT_PreFile:
 			fclose(pFile);
 			LoadPreprocessed(pVGMFile);
+			break;
+		case FT_DROFile:
+			PreProcessDRO(pFile, "out.pre");
+			fclose(pFile);
+			LoadPreprocessed("out.pre");
 			break;
 		default:
 			fclose(pFile);
@@ -2592,6 +2615,11 @@ void PlayPoll3(const char* pVGMFile)
 		case FT_PreFile:
 			fclose(pFile);
 			LoadPreprocessed(pVGMFile);
+			break;
+		case FT_DROFile:
+			PreProcessDRO(pFile, "out.pre");
+			fclose(pFile);
+			LoadPreprocessed("out.pre");
 			break;
 		default:
 			fclose(pFile);
@@ -2644,6 +2672,11 @@ void PlayInt(const char* pVGMFile)
 		case FT_PreFile:
 			fclose(pFile);
 			LoadPreprocessed(pVGMFile);
+			break;
+		case FT_DROFile:
+			PreProcessDRO(pFile, "out.pre");
+			fclose(pFile);
+			LoadPreprocessed("out.pre");
 			break;
 		default:
 			fclose(pFile);

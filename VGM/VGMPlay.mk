@@ -1,3 +1,3 @@
-project : I:\Programming\Oldskool\DOS\VGM\VGMPlay.exe .SYMBOLIC
+project : D:\Programming\Oldskool\DOS\VGM\VGMPlay.exe .SYMBOLIC
 
-!include I:\Programming\Oldskool\DOS\VGM\VGMPlay.mk1
+!include D:\Programming\Oldskool\DOS\VGM\VGMPlay.mk1

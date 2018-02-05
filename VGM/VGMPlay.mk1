@@ -1,66 +1,67 @@
 !define BLANK ""
-I:\Programming\Oldskool\DOS\VGM\8259A.obj : I:\Programming\Oldskool\DOS\COMM&
+D:\Programming\Oldskool\DOS\VGM\8259A.obj : D:\Programming\Oldskool\DOS\COMM&
 ON\C\8259A.C .AUTODEPEND
- @I:
- cd I:\Programming\Oldskool\DOS\VGM
- *wcc ..\COMMON\C\8259A.C -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -z&
+ @D:
+ cd D:\Programming\Oldskool\DOS\VGM
+ *wcc ..\COMMON\C\8259A.C -i="D:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -z&
 q -otexan -ob -ol -ol+ -oc -oi -d2 -fpc -bt=dos -fo=.obj -ms
 
-I:\Programming\Oldskool\DOS\VGM\COMMON.obj : I:\Programming\Oldskool\DOS\COM&
+D:\Programming\Oldskool\DOS\VGM\COMMON.obj : D:\Programming\Oldskool\DOS\COM&
 MON\C\COMMON.C .AUTODEPEND
- @I:
- cd I:\Programming\Oldskool\DOS\VGM
- *wcc ..\COMMON\C\COMMON.C -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -&
+ @D:
+ cd D:\Programming\Oldskool\DOS\VGM
+ *wcc ..\COMMON\C\COMMON.C -i="D:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -&
 zq -otexan -ob -ol -ol+ -oc -oi -d2 -fpc -bt=dos -fo=.obj -ms
 
-I:\Programming\Oldskool\DOS\VGM\DBS2P.obj : I:\Programming\Oldskool\DOS\COMM&
+D:\Programming\Oldskool\DOS\VGM\DBS2P.obj : D:\Programming\Oldskool\DOS\COMM&
 ON\C\DBS2P.c .AUTODEPEND
- @I:
- cd I:\Programming\Oldskool\DOS\VGM
- *wcc ..\COMMON\C\DBS2P.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -z&
+ @D:
+ cd D:\Programming\Oldskool\DOS\VGM
+ *wcc ..\COMMON\C\DBS2P.c -i="D:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -z&
 q -otexan -ob -ol -ol+ -oc -oi -d2 -fpc -bt=dos -fo=.obj -ms
 
-I:\Programming\Oldskool\DOS\VGM\IMFC.obj : I:\Programming\Oldskool\DOS\COMMO&
+D:\Programming\Oldskool\DOS\VGM\IMFC.obj : D:\Programming\Oldskool\DOS\COMMO&
 N\C\IMFC.c .AUTODEPEND
- @I:
- cd I:\Programming\Oldskool\DOS\VGM
- *wcc ..\COMMON\C\IMFC.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq&
+ @D:
+ cd D:\Programming\Oldskool\DOS\VGM
+ *wcc ..\COMMON\C\IMFC.c -i="D:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq&
  -otexan -ob -ol -ol+ -oc -oi -d2 -fpc -bt=dos -fo=.obj -ms
 
-I:\Programming\Oldskool\DOS\VGM\MPU401.obj : I:\Programming\Oldskool\DOS\COM&
+D:\Programming\Oldskool\DOS\VGM\MPU401.obj : D:\Programming\Oldskool\DOS\COM&
 MON\C\MPU401.c .AUTODEPEND
- @I:
- cd I:\Programming\Oldskool\DOS\VGM
- *wcc ..\COMMON\C\MPU401.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -&
+ @D:
+ cd D:\Programming\Oldskool\DOS\VGM
+ *wcc ..\COMMON\C\MPU401.c -i="D:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -&
 zq -otexan -ob -ol -ol+ -oc -oi -d2 -fpc -bt=dos -fo=.obj -ms
 
-I:\Programming\Oldskool\DOS\VGM\SB.obj : I:\Programming\Oldskool\DOS\COMMON\&
+D:\Programming\Oldskool\DOS\VGM\SB.obj : D:\Programming\Oldskool\DOS\COMMON\&
 C\SB.c .AUTODEPEND
- @I:
- cd I:\Programming\Oldskool\DOS\VGM
- *wcc ..\COMMON\C\SB.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq -&
+ @D:
+ cd D:\Programming\Oldskool\DOS\VGM
+ *wcc ..\COMMON\C\SB.c -i="D:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq -&
 otexan -ob -ol -ol+ -oc -oi -d2 -fpc -bt=dos -fo=.obj -ms
 
-I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj : I:\Programming\Oldskool\DOS\VG&
+D:\Programming\Oldskool\DOS\VGM\VGMPlay.obj : D:\Programming\Oldskool\DOS\VG&
 M\VGMPlay.c .AUTODEPEND
- @I:
- cd I:\Programming\Oldskool\DOS\VGM
- *wcc VGMPlay.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq -otexan &
+ @D:
+ cd D:\Programming\Oldskool\DOS\VGM
+ *wcc VGMPlay.c -i="D:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq -otexan &
 -ob -ol -ol+ -oc -oi -d2 -fpc -bt=dos -fo=.obj -ms
 
-I:\Programming\Oldskool\DOS\VGM\VGMPlay.exe : I:\Programming\Oldskool\DOS\VG&
-M\8259A.obj I:\Programming\Oldskool\DOS\VGM\COMMON.obj I:\Programming\Oldsko&
-ol\DOS\VGM\DBS2P.obj I:\Programming\Oldskool\DOS\VGM\IMFC.obj I:\Programming&
-\Oldskool\DOS\VGM\MPU401.obj I:\Programming\Oldskool\DOS\VGM\SB.obj I:\Progr&
-amming\Oldskool\DOS\VGM\VGMPlay.obj I:\Programming\Oldskool\DOS\COMMON\C\825&
-3.h I:\Programming\Oldskool\DOS\COMMON\C\8259A.H I:\Programming\Oldskool\DOS&
-\COMMON\C\COMMON.H I:\Programming\Oldskool\DOS\COMMON\C\DBS2P.h I:\Programmi&
-ng\Oldskool\DOS\COMMON\C\IMFC.h I:\Programming\Oldskool\DOS\COMMON\C\MPU401.&
-h I:\Programming\Oldskool\DOS\COMMON\C\SB.h I:\Programming\Oldskool\DOS\COMM&
-ON\C\stdtype.h I:\Programming\Oldskool\DOS\COMMON\C\TYPES.H I:\Programming\O&
-ldskool\DOS\COMMON\C\VGMFile.h .AUTODEPEND
- @I:
- cd I:\Programming\Oldskool\DOS\VGM
+D:\Programming\Oldskool\DOS\VGM\VGMPlay.exe : D:\Programming\Oldskool\DOS\VG&
+M\8259A.obj D:\Programming\Oldskool\DOS\VGM\COMMON.obj D:\Programming\Oldsko&
+ol\DOS\VGM\DBS2P.obj D:\Programming\Oldskool\DOS\VGM\IMFC.obj D:\Programming&
+\Oldskool\DOS\VGM\MPU401.obj D:\Programming\Oldskool\DOS\VGM\SB.obj D:\Progr&
+amming\Oldskool\DOS\VGM\VGMPlay.obj D:\Programming\Oldskool\DOS\COMMON\C\825&
+3.h D:\Programming\Oldskool\DOS\COMMON\C\8259A.H D:\Programming\Oldskool\DOS&
+\COMMON\C\COMMON.H D:\Programming\Oldskool\DOS\COMMON\C\DBS2P.h D:\Programmi&
+ng\Oldskool\DOS\COMMON\C\IMFC.h D:\Programming\Oldskool\DOS\COMMON\C\MPU401.&
+h D:\Programming\Oldskool\DOS\COMMON\C\SB.h D:\Programming\Oldskool\DOS\COMM&
+ON\C\stdtype.h D:\Programming\Oldskool\DOS\COMMON\C\TYPES.H D:\Programming\O&
+ldskool\DOS\COMMON\C\VGMFile.h D:\Programming\Oldskool\DOS\VGM\DRO.h .AUTODE&
+PEND
+ @D:
+ cd D:\Programming\Oldskool\DOS\VGM
  @%write VGMPlay.lk1 FIL 8259A.obj,COMMON.obj,DBS2P.obj,IMFC.obj,MPU401.obj,&
 SB.obj,VGMPlay.obj
  @%append VGMPlay.lk1 
