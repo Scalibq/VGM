@@ -58,7 +58,7 @@
 #define MAX_MULTICHIP 2
 
 uint16_t SNReg[MAX_MULTICHIP] = { 0xC0, 0xC0 };
-uint16_t SAAReg[MAX_MULTICHIP] = { 0x220, 0x222 };
+uint16_t SAAReg[MAX_MULTICHIP] = { 0x210, 0x212 };
 uint16_t AYReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 uint16_t OPL2Reg[MAX_MULTICHIP] = { 0x388, 0x388 };
 uint16_t OPL3Reg[MAX_MULTICHIP*2] = { 0x220, 0x222, 0x220, 0x222 };	// Special case: there are two separate ports for the chip
@@ -437,7 +437,7 @@ void ResetYMF262(void)
 	uint16_t r, j;
 	volatile uint8_t delay;
 	
-	// Disable 4-OP mode
+/*	// Disable 4-OP mode
 	// Second port
 	outp(OPL3Reg[1], 4);
 	for (j = 0; j < 3; j++)
@@ -452,7 +452,30 @@ void ResetYMF262(void)
 		delay = inp(OPL3Reg[1]);
 	outp(OPL2Reg[1]+1, 0);
 	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
+		delay = inp(OPL3Reg[1]);*/
+	
+	// Write 0 to all YMF262 registers
+	// First port
+	for (r = 0; r < 256; r++)
+	{
+		outp(OPL3Reg[0], r);
+		for (j = 0; j < 6; j++)
+			delay = inp(OPL3Reg[0]);
+		outp(OPL3Reg[0]+1, 0);
+		for (j = 0; j < 35; j++)
+			delay = inp(OPL3Reg[0]);
+	}
+
+	// Second port
+	for (r = 0; r < 256; r++)
+	{
+		outp(OPL3Reg[1], r);
+		for (j = 0; j < 6; j++)
+			delay = inp(OPL3Reg[1]);
+		outp(OPL3Reg[1]+1, 0);
+		for (j = 0; j < 35; j++)
+			delay = inp(OPL3Reg[1]);
+	}
 }
 
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
