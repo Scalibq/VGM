@@ -415,6 +415,46 @@ void ClosePCSpeaker(void)
 	outp(CHAN2PORT, 0);
 }
 
+void ResetYM3812(void)
+{
+	uint16_t r, j;
+	volatile uint8_t delay;
+	
+	// Write 0 to all YM3812 registers
+	for (r = 0; r < 256; r++)
+	{
+		outp(OPL2Reg[0], r);
+		for (j = 0; j < 6; j++)
+			delay = inp(OPL2Reg[0]);
+		outp(OPL2Reg[0]+1, 0);
+		for (j = 0; j < 35; j++)
+			delay = inp(OPL2Reg[0]);
+	}
+}
+
+void ResetYMF262(void)
+{
+	uint16_t r, j;
+	volatile uint8_t delay;
+	
+	// Disable 4-OP mode
+	// Second port
+	outp(OPL3Reg[1], 4);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+	outp(OPL2Reg[1]+1, 0);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+
+	// Disable OPL3 mode
+	outp(OPL3Reg[1], 5);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+	outp(OPL2Reg[1]+1, 0);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+}
+
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
 void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 {
@@ -2959,6 +2999,9 @@ int main(int argc, char* argv[])
 	//InitSampleSN76489();
 	//InitSamplePIT();
 	
+	ResetYM3812();
+	ResetYMF262();
+	
 	// Prepare delay table
 	delayTable[0] = 2;
 	for (i = 1; i < _countof(delayTable); i++)
@@ -2998,6 +3041,9 @@ int main(int argc, char* argv[])
 #elif defined(DBS2P)
 	CloseDBS2P(0x378);
 #endif
+
+	ResetYMF262();
+	ResetYM3812();
 
 	return 0;
 }
