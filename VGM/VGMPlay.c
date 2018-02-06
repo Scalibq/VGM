@@ -18,9 +18,9 @@
 #include "DBS2P.h"
 #include "Endianness.h"
 
-#define MPU401
+//#define MPU401
 //#define IMFC
-//#define SB
+#define SB
 //#define DBS2P
 
 #define M_PI 3.1415926535897932384626433832795
@@ -1566,16 +1566,17 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 		// Calculate PIT ticks required for data so far
 		minDelay = INT_OVERHEAD + (ADLIB_COMMAND_DURATION*length);
 		
-		if (delay <= minDelay)
-		{
-			if (delay > 0)
-				printf("Very small delay detected: %lu!\n", delay);
-		}
-		else
+		if (delay > minDelay)
 		{
 			AddDelay(delay, pOut);
 			delay = 0;
 		}
+		/*else
+		{
+			if (delay > 0)
+				printf("Very small delay detected: %lu!\n", delay);
+		}*/
+
 	}
 	
 	// Output last delay of 0
@@ -1894,20 +1895,21 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		// Is the delay smaller than the time required to send the notes?
 		// Then skip the delay here, concatenate data to previous event, and
 		// fix the total delay later
-		if (delay <= minDelay)
-		{
-			if (delay > 0)
-				printf("Very small delay detected: %lu!\n", delay);
-			
-			oldDelay += delay;
-		}
-		else
+		if (delay > minDelay)
 		{
 			oldDelay = 0;
 			
 			AddDelay(delay, pOut);
 			delay = 0;
 		}
+		else
+		{
+			//if (delay > 0)
+			//	printf("Very small delay detected: %lu!\n", delay);
+			
+			oldDelay += delay;
+		}
+
 	
 		// Get a MIDI command from the stream
 		value = *pData++;
@@ -2173,17 +2175,17 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 				}
 		
 				
-				if (delay <= minDelay)
-				{
-					if (delay > 0)
-						printf("Very small delay detected: %lu!\n", delay);
-				}
-				else
+				if (delay > minDelay)
 				{
 					totalDelay = 0;
 					
 					AddDelay(delay, pOut);
 				}
+				/*/else
+				{
+					if (delay > 0)
+						printf("Very small delay detected: %lu!\n", delay);
+				}*/
 			}
 			
 			// Normal register/data pair
