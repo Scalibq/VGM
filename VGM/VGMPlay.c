@@ -261,7 +261,6 @@ void CloseSB(void)
 
 void InitDBS2P(uint16_t base)
 {
-	uint8_t i, val;
 	volatile uint8_t delay;
 	
 	// Enable parallel mode
@@ -1152,6 +1151,15 @@ void OutputCommands(FILE* pOut)
 	}
 }
 
+void ClearCommands(void)
+{
+	uint16_t i, j;
+	
+	for (i = 0; i < MAX_MULTICHIP; i++)
+		for (j = 0; j < NUM_CHIPS; j++)
+			pCommands[i][j] = commands[i][j] + 1;
+}
+
 typedef enum
 {
 	FT_Unknown,
@@ -1205,7 +1213,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	VGM_HEADER header;
 	uint32_t dataOffset, size;
 	uint16_t firstDelay;
-	uint16_t i, j;
+	uint16_t i;
 
 	fread(&header, sizeof(header), 1, pFile);
 	
@@ -1287,9 +1295,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	_farfwrite(&preHeader, sizeof(preHeader), 1, pOut);
 	
 	// Reset all pointers
-	for (i = 0; i < MAX_MULTICHIP; i++)
-		for (j = 0; j < NUM_CHIPS; j++)
-			pCommands[i][j] = commands[i][j] + 1;
+	ClearCommands();
 		
 	while (playing)
 	{
@@ -1520,9 +1526,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 				
 				// Reset command buffers
 				// (Next delays will get 0 notes exported
-				for (i = 0; i < MAX_MULTICHIP; i++)
-					for (j = 0; j < NUM_CHIPS; j++)
-						pCommands[i][j] = commands[i][j] + 1;
+				ClearCommands();
 			}
 		}
 	}
@@ -1699,7 +1703,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 {
 	MIDIHeader header;
 	MIDIChunk track;
-	uint16_t i, j, t = UINT32_MAX;
+	uint16_t i, t = UINT32_MAX;
 	uint8_t huge* pData;
 	uint16_t firstDelay;
 	uint32_t size, oldDelay = 0;
@@ -1775,9 +1779,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	fclose(pFile);
 	
 	// Reset all pointers
-	for (i = 0; i < MAX_MULTICHIP; i++)
-		for (j = 0; j < NUM_CHIPS; j++)
-			pCommands[i][j] = commands[i][j] + 1;
+	ClearCommands();
 	
 	printf("Start preprocessing MIDI\n");
 	
@@ -1890,11 +1892,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				
 				// Reset command buffers
 				// (Next delays will get 0 notes exported
-				for (i = 0; i < MAX_MULTICHIP; i++)
-					for (j = 0; j < NUM_CHIPS; j++)
-						pCommands[i][j] = commands[i][j] + 1;
-					
-				minDelay = 0;
+				ClearCommands();
 			}
 		}
 	
@@ -2071,7 +2069,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 	uint32_t lengthPairs = 0;
 	uint32_t delay = 0, totalDelay = 0;
 	uint32_t size;
-	uint16_t i, j, firstDelay;
+	uint16_t firstDelay;
 	
 	fread(&header, sizeof(header), 1, pFile);
 	
@@ -2114,9 +2112,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 	_farfwrite(&preHeader, sizeof(preHeader), 1, pOut);
 	
 	// Reset all pointers
-	for (i = 0; i < MAX_MULTICHIP; i++)
-		for (j = 0; j < NUM_CHIPS; j++)
-			pCommands[i][j] = commands[i][j] + 1;
+	ClearCommands();
 	
 	printf("Start preprocessing DRO\n");
 
@@ -2188,9 +2184,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 						
 						// Reset command buffers
 						// (Next delays will get 0 notes exported
-						for (i = 0; i < MAX_MULTICHIP; i++)
-							for (j = 0; j < NUM_CHIPS; j++)
-								pCommands[i][j] = commands[i][j] + 1;
+						ClearCommands();
 					}
 				}
 			}
