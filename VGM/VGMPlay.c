@@ -1201,6 +1201,35 @@ void AddCommandBuffer(uint16_t chip, uint16_t type, uint8_t far* pCmds, uint16_t
 		AddCommand(chip, type, pCmds[i], pOut);
 }
 
+void AddDelay(uint32_t delay, FILE *pOut)
+{
+	// Break up into multiple delays with no notes
+	while (delay > 0)
+	{
+		uint16_t firstDelay;
+		
+		if (delay >= 65536L)
+		{
+			firstDelay = 0;
+			delay -= 65536L;
+		}
+		else
+		{
+			firstDelay = delay;
+			delay = 0;
+		}
+	
+		// First write delay value
+		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+		
+		// Now output commands
+		OutputCommands(pOut);
+		
+		// Reset command buffers
+		// (Next delays will get 0 notes exported
+		ClearCommands();
+	}
+}
 
 typedef enum
 {
@@ -1544,43 +1573,16 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 		}
 		else
 		{
-			// Break up into multiple delays with no notes
-			while (delay > 0)
-			{
-				if (delay >= 65536L)
-				{
-					firstDelay = 0;
-					delay -= 65536L;
-				}
-				else
-				{
-					firstDelay = delay;
-					delay = 0;
-				}
-			
-				// First write delay value
-				fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-				
-				// Now output commands
-				OutputCommands(pOut);
-				
-				// Reset command buffers
-				// (Next delays will get 0 notes exported
-				ClearCommands();
-			}
+			AddDelay(delay, pOut);
+			delay = 0;
 		}
 	}
 	
 	// Output last delay of 0
-	firstDelay = 0;
-
-	// Write to disk
-	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-	
-	// Output last set of commands
-	OutputCommands(pOut);
+	AddDelay(0, pOut);
 	
 	// And a final delay of 0, which would get fetched by the last int handler
+	firstDelay = 0;
 	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
 	
 	// Update size field
@@ -1902,31 +1904,9 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		else
 		{
 			oldDelay = 0;
-		
-			// Break up into multiple delays with no notes
-			while (delay > 0)
-			{
-				if (delay >= 65536L)
-				{
-					firstDelay = 0;
-					delay -= 65536L;
-				}
-				else
-				{
-					firstDelay = delay;
-					delay = 0;
-				}
-				
-				// First write delay value
-				fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-				
-				// Now output commands
-				OutputCommands(pOut);
-				
-				// Reset command buffers
-				// (Next delays will get 0 notes exported
-				ClearCommands();
-			}
+			
+			AddDelay(delay, pOut);
+			delay = 0;
 		}
 	
 		// Get a MIDI command from the stream
@@ -2064,15 +2044,10 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	}
 	
 	// Output last delay of 0
-	firstDelay = 0;
-
-	// Write to disk
-	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-	
-	// Output last set of commands
-	OutputCommands(pOut);
+	AddDelay(0, pOut);
 	
 	// And a final delay of 0, which would get fetched by the last int handler
+	firstDelay = 0;
 	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
 	
 	// Update size field
@@ -2205,31 +2180,9 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 				}
 				else
 				{
-					totalDelay =0;
+					totalDelay = 0;
 					
-					while (delay > 0)
-					{
-						if (delay >= 65536L)
-						{
-							firstDelay = 0;
-							delay -= 65536L;
-						}
-						else
-						{
-							firstDelay = delay;
-							delay = 0;
-						}
-						
-						// First write delay value
-						fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-						
-						// Now output commands
-						OutputCommands(pOut);
-						
-						// Reset command buffers
-						// (Next delays will get 0 notes exported
-						ClearCommands();
-					}
+					AddDelay(delay, pOut);
 				}
 			}
 			
@@ -2259,15 +2212,10 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 	}
 	
 	// Output last delay of 0
-	firstDelay = 0;
+	AddDelay(0, pOut);
 
-	// Write to disk
-	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-	
-	// Output last set of commands
-	OutputCommands(pOut);
-	
 	// And a final delay of 0, which would get fetched by the last int handler
+	firstDelay = 0;
 	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
 	
 	// Update size field
