@@ -1134,7 +1134,7 @@ void OutputCommands(FILE* pOut)
 	
 	for (i = 0; i < preHeader.nrOfMIDI; i++)
 	{
-		count = GetCommandLengthCount(i, SN76489, &length);
+		count = GetCommandLengthCount(i, MIDI, &length);
 	
 		commands[i][MIDI][0] = count;
 		fwrite(commands[i][MIDI], length, 1, pOut);
