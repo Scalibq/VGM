@@ -1056,50 +1056,62 @@ void SavePreprocessed(const char* pFileName);
 uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][256];
 uint8_t* pCommands[MAX_MULTICHIP][NUM_CHIPS];
 
+uint16_t GetCommandLengthCount(uint16_t chip, uint16_t type, uint16_t *pLength)
+{
+	uint16_t count;
+	uint16_t length = pCommands[chip][type] - commands[chip][type];
+	if (pLength != NULL)
+		*pLength = length;
+	
+	count = length - 1;
+	
+	// Adjust count for chips that need multiple bytes per command
+	switch (type)
+	{
+		case SAA1099:
+		case AY8930:
+		case YM3812:
+		case YMF262PORT0:
+		case YMF262PORT1:
+			count >>= 1;
+			break;
+	}
+
+	return count;	
+}
+
 void OutputCommands(FILE* pOut)
 {
 	uint16_t count, length, i;
 
 	for (i = 0; i < preHeader.nrOfSN76489; i++)
 	{
-		length = pCommands[i][SN76489] - commands[i][SN76489];
-		count = (length - 1);
+		count = GetCommandLengthCount(i, SN76489, &length);
 
-		if (count > 255)
-			printf("Too many SN76489 commands: %u!\n", count);
 		commands[i][SN76489][0] = count;
 		fwrite(commands[i][SN76489], length, 1, pOut);
 	}
 		
 	for (i = 0; i < preHeader.nrOfSAA1099; i++)
 	{
-		length = pCommands[i][SAA1099] - commands[i][SAA1099];
-		count = (length - 1) / 2;
+		count = GetCommandLengthCount(i, SAA1099, &length);
 
-		if (count > 255)
-			printf("Too many SAA1099 commands: %u!\n", count);
 		commands[i][SAA1099][0] = count;
 		fwrite(commands[i][SAA1099], length, 1, pOut);
 	}
 				
 	for (i = 0; i < preHeader.nrOfAY8930; i++)
 	{
-		length = pCommands[i][AY8930] - commands[i][AY8930];
-		count = (length - 1) / 2;
+		count = GetCommandLengthCount(i, AY8930, &length);
 
-		if (count > 255)
-			printf("Too many AY8930 commands: %u!\n", count);
 		commands[i][AY8930][0] = count;
 		fwrite(commands[i][AY8930], length, 1, pOut);
 	}
 
 	for (i = 0; i < preHeader.nrOfYM3812; i++)
 	{
-		length = pCommands[i][YM3812] - commands[i][YM3812];
-		count = (length - 1) / 2;
+		count = GetCommandLengthCount(i, YM3812, &length);
 
-		if (count > 255)
-			printf("Too many YM3812 commands: %u!\n", count);
 		commands[i][YM3812][0] = count;
 		fwrite(commands[i][YM3812], length, 1, pOut);
 	}
@@ -1107,45 +1119,22 @@ void OutputCommands(FILE* pOut)
 	for (i = 0; i < preHeader.nrOfYMF262; i++)
 	{
 		// First port 0 commands
-		length = pCommands[i][YMF262PORT0] - commands[i][YMF262PORT0];
-		count = (length - 1) / 2;
+		count = GetCommandLengthCount(i, YMF262PORT0, &length);
 
-		if (count > 255)
-			printf("Too many YMF262 port 0 commands: %u!\n", count);
 		commands[i][YMF262PORT0][0] = count;
 		fwrite(commands[i][YMF262PORT0], length, 1, pOut);
 
 		// Then port 1 commands
-		length = pCommands[i][YMF262PORT1] - commands[i][YMF262PORT1];
-		count = (length - 1) / 2;
+		count = GetCommandLengthCount(i, YMF262PORT1, &length);
 
-		if (count > 255)
-			printf("Too many YMF262 port 1 commands: %u!\n", count);
 		commands[i][YMF262PORT1][0] = count;
 		fwrite(commands[i][YMF262PORT1], length, 1, pOut);
 	}
 	
 	for (i = 0; i < preHeader.nrOfMIDI; i++)
 	{
-		uint8_t* pData = commands[i][MIDI] + 1;
-		
-		length = pCommands[i][MIDI] - commands[i][MIDI];
-		count = (length - 1);
-
-		while (count > 255)
-		{
-			uint16_t delay = 2;
-			
-			commands[i][MIDI][0] = 255;
-			fwrite(commands[i][MIDI], 1, 1, pOut);
-			fwrite(pData, 1, 255, pOut);
-			
-			count -= 255;
-			length -= 255;
-			pData += 255;
-			fwrite(&delay, sizeof(delay), 1, pOut);
-		}
-		
+		count = GetCommandLengthCount(i, SN76489, &length);
+	
 		commands[i][MIDI][0] = count;
 		fwrite(commands[i][MIDI], length, 1, pOut);
 	}
@@ -1844,7 +1833,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		
 		delay = GETMIDIDELAY(delta) + oldDelay;
 		
-		length = pCommands[0][MIDI] - commands[0][MIDI];
+		length = GetCommandLengthCount(0, MIDI, NULL);
 		
 		// Calculate PIT ticks required for data so far
 		minDelay = INT_OVERHEAD + (MIDI_BYTE_DURATION*length);
@@ -2149,7 +2138,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 				// Convert to PIT ticks
 				delay = totalDelay*(PITFREQ/1000.0);
 				
-				length = pCommands[0][YM3812] - commands[0][YM3812];
+				length = GetCommandLengthCount(0, YM3812, NULL);
 		
 				// Calculate PIT ticks required for data so far
 				minDelay = INT_OVERHEAD + (ADLIB_BYTE_DURATION*length);
