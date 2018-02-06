@@ -18,9 +18,9 @@
 #include "DBS2P.h"
 #include "Endianness.h"
 
-//#define MPU401
+#define MPU401
 //#define IMFC
-#define SB
+//#define SB
 //#define DBS2P
 
 #define M_PI 3.1415926535897932384626433832795
@@ -42,7 +42,8 @@
 #define INT_OVERHEAD (100)
 #define EPSILON 381
 
-#define	ADLIB_BYTE_DURATION	(250)
+#define	ADLIB_COMMAND_DURATION	(250)
+#define	OPL3_COMMAND_DURATION	(125)
 
 // Index for each sound chip in a command stream
 #define SN76489 0
@@ -1053,7 +1054,7 @@ void PlayImmediate(const char* pVGMFile)
 
 void SavePreprocessed(const char* pFileName);
 
-uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][256];
+uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][510];	// We currently support a max count of 255 commands, and largest is 2 byte commands
 uint8_t* pCommands[MAX_MULTICHIP][NUM_CHIPS];
 
 uint16_t GetCommandLengthCount(uint16_t chip, uint16_t type, uint16_t *pLength)
@@ -1148,6 +1149,58 @@ void ClearCommands(void)
 		for (j = 0; j < NUM_CHIPS; j++)
 			pCommands[i][j] = commands[i][j] + 1;
 }
+
+void AddCommand(uint16_t chip, uint16_t type, uint8_t cmd, FILE *pOut)
+{
+	uint8_t count = GetCommandLengthCount(chip, type, NULL);
+	
+	// If we exceed 255 commands, we need to flush, because we cannot handle more commands
+	if (count >= 255)
+	{
+		uint8_t firstDelay = 1;
+		
+		// First write delay value
+		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+				
+		// Now output commands
+		OutputCommands(pOut);
+		ClearCommands();
+	}
+	
+	// Add new command
+	*pCommands[chip][type]++ = cmd;
+}
+
+void AddCommandMulti(uint16_t chip, uint16_t type, uint8_t cmd1, uint8_t cmd2, FILE *pOut)
+{
+	uint8_t count = GetCommandLengthCount(chip, type, NULL);
+	
+	// If we exceed 255 commands, we need to flush, because we cannot handle more commands
+	if (count >= 255)
+	{
+		uint8_t firstDelay = 1;
+		
+		// First write delay value
+		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+				
+		// Now output commands
+		OutputCommands(pOut);
+		ClearCommands();
+	}
+	
+	// Add new command
+	*pCommands[chip][type]++ = cmd1;
+	*pCommands[chip][type]++ = cmd2;
+}
+
+void AddCommandBuffer(uint16_t chip, uint16_t type, uint8_t far* pCmds, uint16_t length, FILE *pOut)
+{
+	uint16_t i;
+	
+	for (i = 0; i < length; i++)
+		AddCommand(chip, type, pCmds[i], pOut);
+}
+
 
 typedef enum
 {
@@ -1288,6 +1341,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 		
 	while (playing)
 	{
+		uint8_t data[2];
 		uint8_t value = fgetc(pFile);
 		
 		switch (value)
@@ -1391,46 +1445,48 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 				fseek(pFile, 1, SEEK_CUR);
 				break;
 			case 0x50:	// dd : PSG (SN76489/SN76496) write value dd
-				*pCommands[0][SN76489]++ = fgetc(pFile);
+				AddCommand(0, SN76489, fgetc(pFile), pOut);
 				break;
 			case 0x30:	// dd : Second PSG (SN76489/SN76496) write value dd
-				*pCommands[1][SN76489]++ = fgetc(pFile);
+				AddCommand(1, SN76489, fgetc(pFile), pOut);
 				break;
 			case 0x5A:	// aa dd : YM3812, write value dd to register aa
-				*pCommands[0][YM3812]++ = fgetc(pFile);
-				*pCommands[0][YM3812]++ = fgetc(pFile);
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(0, YM3812, data[0], data[1], pOut);
 				break;
 			case 0xAA:	// aa dd : Second YM3812, write value dd to register aa
-				*pCommands[1][YM3812]++ = fgetc(pFile);
-				*pCommands[1][YM3812]++ = fgetc(pFile);
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(1, YM3812, data[0], data[1], pOut);
 				break;
 			case 0x5E:	// aa dd : YMF262 port 0, write value dd to register aa
-				*pCommands[0][YMF262PORT0]++ = fgetc(pFile);
-				*pCommands[0][YMF262PORT0]++ = fgetc(pFile);
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(0, YMF262PORT0, data[0], data[1], pOut);
 				break;
 			case 0x5F:	// aa dd : YMF262 port 1, write value dd to register aa
-				*pCommands[0][YMF262PORT1]++ = fgetc(pFile);
-				*pCommands[0][YMF262PORT1]++ = fgetc(pFile);
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(0, YMF262PORT1, data[0], data[1], pOut);
 				break;
 			case 0xA0:	// aa dd : AY8910, write value dd to register aa
 				// Second chip is indicated by msb in first byte
-				value = fgetc(pFile);
-				i = (value & 0x80) ? 1 : 0;
-
-				*pCommands[i][AY8930]++ = value & 0x7F;
-				*pCommands[i][AY8930]++ = fgetc(pFile);
+				fread(data, sizeof(data), 1, pFile);
+				i = (data[0] & 0x80) ? 1 : 0;
+				AddCommandMulti(i, AY8930, data[0] & 0x7F, data[1], pOut);
 				break;
 			case 0xBD:	// aa dd : SAA1099, write value dd to register aa
 				// Second chip is indicated by msb in first byte
-				value = fgetc(pFile);
-				i = (value & 0x80) ? 1 : 0;
-
-				*pCommands[i][SAA1099]++ = value & 0x7F;
-				*pCommands[i][SAA1099]++ = fgetc(pFile);
+				fread(data, sizeof(data), 1, pFile);
+				i = (data[0] & 0x80) ? 1 : 0;
+				AddCommandMulti(i, SAA1099, data[0] & 0x7F, data[1], pOut);
 				break;
-			
 			case 0xAE:	// aa dd : Second YMF262 port 0, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(1, YMF262PORT0, data[0], data[1], pOut);
+				break;
 			case 0xAF:	// aa dd : Second YMF262 port 1, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(1, YMF262PORT0, data[0], data[1], pOut);
+				break;
+		
 			case 0x51:	// aa dd : YM2413, write value dd to register aa
 			case 0xA1:	// aa dd : Second YM2413, write value dd to register aa
 			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
@@ -1474,16 +1530,12 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 		// So there are exactly 3 OPL2 cycles to every PIT cycle. Translating that is:
 		// 4 PIT cycles for the data delay and 28 PIT cycles for the address delay
 		// That is a total of 32 PIT cycles for every write
-		/*if (delay < 32)
-		{
-			printf("Extremely small delay encountered: %lu. Skipping\n", delay);
-			continue;
-		}*/
 		
-		length = pCommands[0][YM3812] - commands[0][YM3812];
+		// TODO: Calculate for all chips
+		length = GetCommandLengthCount(0, YM3812, NULL);
 
 		// Calculate PIT ticks required for data so far
-		minDelay = INT_OVERHEAD + (ADLIB_BYTE_DURATION*length);
+		minDelay = INT_OVERHEAD + (ADLIB_COMMAND_DURATION*length);
 		
 		if (delay <= minDelay)
 		{
@@ -1492,7 +1544,6 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 		}
 		else
 		{
-			
 			// Break up into multiple delays with no notes
 			while (delay > 0)
 			{
@@ -1855,8 +1906,6 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 			// Break up into multiple delays with no notes
 			while (delay > 0)
 			{
-				uint32_t tempDelay;
-				
 				if (delay >= 65536L)
 				{
 					firstDelay = 0;
@@ -1868,11 +1917,6 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 					delay = 0;
 				}
 				
-				tempDelay = firstDelay == 0 ? 65536L : firstDelay;
-				
-				if (tempDelay < minDelay)
-					printf("Problem: takes longer to write commands than max interrupt interval!\n");
-			
 				// First write delay value
 				fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
 				
@@ -1898,9 +1942,8 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				printf("SysEx F0, length: %lu\n", length);
 				
 				// Pre-pend 0xF0, it is implicit
-				*pCommands[0][MIDI]++ = value;
-				_fmemcpy(pCommands[0][MIDI], pData, length);
-				pCommands[0][MIDI] += length;
+				pData[-1] = value;
+				AddCommandBuffer(0, MIDI, pData-1, length+1, pOut);
 				pData += length;
 				break;
 			// Escaped SysEx (resets running status)
@@ -1910,8 +1953,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				
 				printf("SysEx F7, length: %lu\n", length);
 				
-				_fmemcpy(pCommands[0][MIDI], pData, length);
-				pCommands[0][MIDI] += length;
+				AddCommandBuffer(0, MIDI, pData, length, pOut);
 				pData += length;
 				break;
 			// Meta event (resets running status)
@@ -1939,7 +1981,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 			case 0xF6:
 				// Tune request (single byte)
 				lastStatus = 0;
-				*pCommands[0][MIDI]++ = value;
+				AddCommand(0, MIDI, value, pOut);
 				break;
 			// Real-time messages (do not participate in running status)
 			case 0xF8:
@@ -1950,7 +1992,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 			case 0xFD:
 			case 0xFE:
 				// Just a single byte, should never occur in a MIDI file?
-				*pCommands[0][MIDI]++ = value;
+				AddCommand(0, MIDI, value, pOut);
 				break;
 
 			// Reserved (resets running status)
@@ -2002,14 +2044,12 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				if (lastStatus == pData[-1])
 				{
 					// Skip first byte, as it's the same as before
-					_fmemcpy(pCommands[0][MIDI], pData, length);
-					pCommands[0][MIDI] += length;
+					AddCommandBuffer(0, MIDI, pData, length, pOut);
 				}
 				else
 				{
 					// Send first byte as well
-					_fmemcpy(pCommands[0][MIDI], pData-1, length+1);
-					pCommands[0][MIDI] += length + 1;
+					AddCommandBuffer(0, MIDI, pData-1, length+1, pOut);
 				}
 				lastStatus = pData[-1];
 				pData += length;
@@ -2138,10 +2178,25 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 				// Convert to PIT ticks
 				delay = totalDelay*(PITFREQ/1000.0);
 				
-				length = GetCommandLengthCount(0, YM3812, NULL);
-		
 				// Calculate PIT ticks required for data so far
-				minDelay = INT_OVERHEAD + (ADLIB_BYTE_DURATION*length);
+				switch (header.hardware)
+				{
+					case 0:	// OPL2
+						length = GetCommandLengthCount(0, YM3812, NULL);
+						minDelay = INT_OVERHEAD + (ADLIB_COMMAND_DURATION*length);
+						break;
+					case 1:	// Dual OPL2
+						length = max(GetCommandLengthCount(0, YM3812, NULL),
+										GetCommandLengthCount(1, YM3812, NULL));
+						minDelay = INT_OVERHEAD + (ADLIB_COMMAND_DURATION*length);
+						break;
+					case 2:	// OPL3
+						length = max(GetCommandLengthCount(0, YMF262PORT0, NULL),
+										GetCommandLengthCount(0, YMF262PORT1, NULL));
+						minDelay = INT_OVERHEAD + (OPL3_COMMAND_DURATION*length);
+						break;
+				}
+		
 				
 				if (delay <= minDelay)
 				{
@@ -2189,21 +2244,14 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 			{
 				// OPL3
 				if (!chip)
-				{
-					*pCommands[0][YMF262PORT0]++ = conversionTable[data[0]];
-					*pCommands[0][YMF262PORT0]++ = data[1];
-				}
+					AddCommandMulti(0, YMF262PORT0,conversionTable[data[0]], data[1], pOut);
 				else
-				{
-					*pCommands[0][YMF262PORT1]++ = conversionTable[data[0]];
-					*pCommands[0][YMF262PORT1]++ = data[1];
-				}
+					AddCommandMulti(0, YMF262PORT1,conversionTable[data[0]], data[1], pOut);
 			}
 			else
 			{
 				// OPL2
-				*pCommands[chip][YM3812]++ = conversionTable[data[0]];
-				*pCommands[chip][YM3812]++ = data[1];
+				AddCommandMulti(chip, YM3812,conversionTable[data[0]], data[1], pOut);
 			}
 		}
 		
