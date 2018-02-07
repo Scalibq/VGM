@@ -432,27 +432,10 @@ void ResetYM3812(void)
 	}
 }
 
-void ResetYMF262(void)
+void SetYMF262(uint8_t opl3, uint8_t, fourOp)
 {
 	uint16_t r, j;
 	volatile uint8_t delay;
-	
-/*	// Disable 4-OP mode
-	// Second port
-	outp(OPL3Reg[1], 4);
-	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
-	outp(OPL2Reg[1]+1, 0);
-	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
-
-	// Disable OPL3 mode
-	outp(OPL3Reg[1], 5);
-	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
-	outp(OPL2Reg[1]+1, 0);
-	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);*/
 	
 	// Write 0 to all YMF262 registers
 	// First port
@@ -476,6 +459,28 @@ void ResetYMF262(void)
 		for (j = 0; j < 35; j++)
 			delay = inp(OPL3Reg[1]);
 	}
+	
+	// Enable 4-OP mode
+	// Second port
+	outp(OPL3Reg[1], 4);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+	outp(OPL2Reg[1]+1, fourOp);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+
+	// Enable OPL3 mode
+	outp(OPL3Reg[1], 5);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+	outp(OPL2Reg[1]+1, opl3);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+}
+
+void ResetYMF262(void)
+{
+	SetYMF262(0, 0);
 }
 
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
@@ -3023,7 +3028,7 @@ int main(int argc, char* argv[])
 	//InitSamplePIT();
 	
 	ResetYM3812();
-	ResetYMF262();
+	SetYMF262(0, 0);
 	
 	// Prepare delay table
 	delayTable[0] = 2;
