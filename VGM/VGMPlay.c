@@ -42,8 +42,11 @@
 #define INT_OVERHEAD (100)
 #define EPSILON 381
 
-#define	ADLIB_COMMAND_DURATION	(250)
-#define	OPL3_COMMAND_DURATION	(125)
+#define	SN76489_COMMAND_DURATION	(12)
+#define	SAA1099_COMMAND_DURATION	(12)
+#define	AY8930_COMMAND_DURATION		(12)
+#define	ADLIB_COMMAND_DURATION		(250)
+#define	OPL3_COMMAND_DURATION		(125)
 
 // Index for each sound chip in a command stream
 #define SN76489 0
@@ -432,7 +435,7 @@ void ResetYM3812(void)
 	}
 }
 
-void SetYMF262(uint8_t opl3, uint8_t, fourOp)
+void SetYMF262(uint8_t opl3, uint8_t fourOp)
 {
 	uint16_t r, j;
 	volatile uint8_t delay;
@@ -1628,12 +1631,45 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 		// 4 PIT cycles for the data delay and 28 PIT cycles for the address delay
 		// That is a total of 32 PIT cycles for every write
 		
-		// TODO: Calculate for all chips
-		length = GetCommandLengthCount(0, YM3812, NULL);
-
 		// Calculate PIT ticks required for data so far
-		minDelay = INT_OVERHEAD + (ADLIB_COMMAND_DURATION*length);
+		minDelay = INT_OVERHEAD;
 		
+		for (i = 0; i < preHeader.nrOfSN76489; i++)
+		{
+			length = GetCommandLengthCount(i, SN76489, NULL);
+			minDelay += (SN76489_COMMAND_DURATION*length);
+		}
+
+		for (i = 0; i < preHeader.nrOfSAA1099; i++)
+		{
+			length = GetCommandLengthCount(i, SAA1099, NULL);
+			minDelay += (SAA1099_COMMAND_DURATION*length);
+		}
+
+		for (i = 0; i < preHeader.nrOfAY8930; i++)
+		{
+			length = GetCommandLengthCount(i, AY8930, NULL);
+			minDelay += (AY8930_COMMAND_DURATION*length);
+		}
+		
+		for (i = 0; i < preHeader.nrOfYM3812; i++)
+		{
+			length = GetCommandLengthCount(i, YM3812, NULL);
+			minDelay += (ADLIB_COMMAND_DURATION*length);
+		}
+
+		for (i = 0; i < preHeader.nrOfYMF262; i++)
+		{
+			length = GetCommandLengthCount(i, YMF262PORT0, NULL) + GetCommandLengthCount(i, YMF262PORT1, NULL);
+			minDelay += (OPL3_COMMAND_DURATION*length);
+		}
+		
+		for (i = 0; i < preHeader.nrOfMIDI; i++)
+		{
+			length = GetCommandLengthCount(i, MIDI, NULL);
+			minDelay += (MIDI_BYTE_DURATION*length);
+		}
+
 		if (delay > minDelay)
 		{
 			AddDelay(delay, pOut);
@@ -2231,13 +2267,11 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 						minDelay = INT_OVERHEAD + (ADLIB_COMMAND_DURATION*length);
 						break;
 					case 1:	// Dual OPL2
-						length = max(GetCommandLengthCount(0, YM3812, NULL),
-										GetCommandLengthCount(1, YM3812, NULL));
+						length = GetCommandLengthCount(0, YM3812, NULL) + GetCommandLengthCount(1, YM3812, NULL);
 						minDelay = INT_OVERHEAD + (ADLIB_COMMAND_DURATION*length);
 						break;
 					case 2:	// OPL3
-						length = max(GetCommandLengthCount(0, YMF262PORT0, NULL),
-										GetCommandLengthCount(0, YMF262PORT1, NULL));
+						length = GetCommandLengthCount(0, YMF262PORT0, NULL) + GetCommandLengthCount(0, YMF262PORT1, NULL);
 						minDelay = INT_OVERHEAD + (OPL3_COMMAND_DURATION*length);
 						break;
 				}
