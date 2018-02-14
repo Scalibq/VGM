@@ -69,6 +69,8 @@ uint16_t MPUReg[MAX_MULTICHIP] = { 0x330, 0x330 };
 uint16_t IMFCReg[MAX_MULTICHIP] = { 0x2A20, 0x2A20 };
 uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 
+uint16_t lpt = 0x378;
+
 typedef struct _PreHeader
 {
 	char marker[4];				// = {'P','r','e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
@@ -440,6 +442,15 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	uint16_t r, j;
 	volatile uint8_t delay;
 	
+	// Enable OPL3-mode so both ports can be reset
+	// Enable OPL3 mode
+	outp(OPL3Reg[1], 5);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+	outp(OPL2Reg[1]+1, 1);
+	for (j = 0; j < 3; j++)
+		delay = inp(OPL3Reg[1]);
+	
 	// Write 0 to all YMF262 registers
 	// First port
 	for (r = 0; r < 256; r++)
@@ -453,7 +464,18 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	}
 
 	// Second port
-	for (r = 0; r < 256; r++)
+	for (r = 0; r < 4; r++)
+	{
+		outp(OPL3Reg[1], r);
+		for (j = 0; j < 6; j++)
+			delay = inp(OPL3Reg[1]);
+		outp(OPL3Reg[1]+1, 0);
+		for (j = 0; j < 35; j++)
+			delay = inp(OPL3Reg[1]);
+	}
+	
+	// Skip registers 4 and 5, they enable/disable OPL3 functionalities	
+	for (r = 6; r < 255; r++)
 	{
 		outp(OPL3Reg[1], r);
 		for (j = 0; j < 6; j++)
@@ -685,7 +707,7 @@ void PlayData(void)
 #elif defined(SB)
 		OutputMIDI(SBReg[i], pBuf, count);
 #elif defined(DBS2P)
-		OutputMIDI(0x378, pBuf, count);
+		OutputMIDI(lpt, pBuf, count);
 #endif
 
 		pBuf += count;
@@ -3035,10 +3057,16 @@ int main(int argc, char* argv[])
 	fclose(pFile);
 	
 	// Parse port
-	if (argc > 2)
+/*	if (argc > 2)
 		sscanf(argv[2], "%X", &SNReg[0]);
 
-	printf("Using SN76489 at port %Xh\n", SNReg[0]);
+	printf("Using SN76489 at port %Xh\n", SNReg[0]);*/
+	
+	if (argc > 2)
+		sscanf(argv[2], "%X", &lpt);
+
+	printf("Using LPT at port %Xh\n", lpt);
+	
 	
 	InitPCjrAudio();
 	//SetPCjrAudio(1,440,15);
@@ -3050,7 +3078,7 @@ int main(int argc, char* argv[])
 #elif defined(SB)
 	InitSB();
 #elif defined(DBS2P)
-	InitDBS2P(0x378);
+	InitDBS2P(lpt);
 #endif
 
 	// Set up channels to play samples, by setting frequency 0
@@ -3101,7 +3129,7 @@ int main(int argc, char* argv[])
 #elif defined(SB)
 	CloseSB();
 #elif defined(DBS2P)
-	CloseDBS2P(0x378);
+	CloseDBS2P(lpt);
 #endif
 
 	ResetYMF262();
