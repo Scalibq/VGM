@@ -23,6 +23,7 @@
 //#define IMFC
 //#define SB
 #define DBS2P
+#define OPL2LPT
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -659,12 +660,17 @@ void PlayData(void)
 	
 		while (count--)
 		{
+#if defined(OPL2LPT)
+			WriteOPL2LPTAddr(lpt, *pBuf++);
+			WriteOPL2LPTData(lpt, *pBuf++);
+#else
 			outp(OPL2Reg[i], *pBuf++);
 			for (j = 0; j < 6; j++)
 				delay = inp(OPL2Reg[i]);
 			outp(OPL2Reg[i]+1, *pBuf++);
 			for (j = 0; j < 35; j++)
 				delay = inp(OPL2Reg[i]);
+#endif
 		}
 	}
 		
