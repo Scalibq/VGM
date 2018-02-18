@@ -16,12 +16,13 @@
 #include "IMFC.h"
 #include "SB.h"
 #include "DBS2P.h"
+#include "OPL2LPT.h"
 #include "Endianness.h"
 
 //#define MPU401
 //#define IMFC
-#define SB
-//#define DBS2P
+//#define SB
+#define DBS2P
 
 #define M_PI 3.1415926535897932384626433832795
 
