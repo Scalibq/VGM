@@ -430,12 +430,17 @@ void ResetYM3812(void)
 	// Write 0 to all YM3812 registers
 	for (r = 0; r < 256; r++)
 	{
+#if defined(OPL2LPT)
+		WriteOPL2LPTAddr(lpt, r);
+		WriteOPL2LPTData(lpt, 0);
+#else
 		outp(OPL2Reg[0], r);
 		for (j = 0; j < 6; j++)
 			delay = inp(OPL2Reg[0]);
 		outp(OPL2Reg[0]+1, 0);
 		for (j = 0; j < 35; j++)
 			delay = inp(OPL2Reg[0]);
+#endif
 	}
 }
 
