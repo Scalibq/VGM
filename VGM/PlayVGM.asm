@@ -11,7 +11,7 @@ include OPL2LPT.inc
 BUFSIZE equ 32768
 NUMBUF equ 1
 
-LPT_BASE equ 0378h
+LPT_BASE equ 03BCh
 
 PreHeader struc
 	marker 		db 4 dup(?)	; = {'P','r','e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
@@ -495,8 +495,8 @@ noteLoop:
 	loop noteLoop
 
 	pop dx		
-	pop cx
 	pop bx
+	pop cx
 		
 endHandler:
 	; Get delay value from stream
