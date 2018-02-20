@@ -72,6 +72,7 @@ uint16_t IMFCReg[MAX_MULTICHIP] = { 0x2A20, 0x2A20 };
 uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 
 uint16_t lpt = 0x378;
+uint8_t mt32Mode = 0;	// Special mode to prefix any program change with a special command for DreamBlaster S2(P) for MT-32 instruments
 
 typedef struct _PreHeader
 {
@@ -2152,6 +2153,19 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 					tracks[t].lastLength = length - 1;
 					tracks[t].runningStatus = value;					
 				}
+				
+				// Perform MT-32 mode for DreamBlaster S2(P)
+				if (mt32Mode && (pData[-1] & 0xF0) == PC)
+				{
+					// Insert MT-32 command, CC 0 = 127
+					static uint8_t MT32[] = { 0xB0, 0, 127 };
+
+					// Set proper channel
+					MT32[0] = 0xB0 | (pData[-1] & 0x0F);
+					
+					AddCommandBuffer(0, MIDI, MT32, _countof(MT32), pOut);
+					lastStatus = MT32[0];
+				}
 
 				// Replace NOTE OFF messages with NOTE ON with velocity 0
 				if ((pData[-1] & 0xF0) == NOTE_OFF)
@@ -3078,6 +3092,16 @@ int main(int argc, char* argv[])
 		sscanf(argv[2], "%X", &lpt);
 
 	printf("Using LPT at port %Xh\n", lpt);
+	
+	for (i = 1; i < argc; i++)
+	{
+		if (stricmp(argv[i], "/mt32") == 0)
+		{
+			mt32Mode = 1;
+			
+			printf("DreamBlaster S2(P) MT-32 mode enabled.\n");
+		}
+	}
 	
 	
 	InitPCjrAudio();
