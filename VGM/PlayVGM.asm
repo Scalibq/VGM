@@ -2,11 +2,16 @@
 .Model Small
 
 include common.inc
+include cmdline.inc
 include 8253.inc
 include 8259A.inc
+include LPT.inc
+include OPL2LPT.inc
 
 BUFSIZE equ 32768
 NUMBUF equ 1
+
+LPT_BASE equ 0378h
 
 PreHeader struc
 	marker 		db 4 dup(?)	; = {'P','r','e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
@@ -28,6 +33,7 @@ LOCALS @@
 
 .data?
 preHeader PreHeader <>
+_cmdline		CMDLINE	<>
 
 .code
 start:
@@ -84,7 +90,7 @@ getfname:
 	;out PIC1_DATA, al
 
 	mov		ah, 4Ah
-	mov		bx, 3000h
+	mov		bx, 100h	; TODO: Calculate proper size!!
 	int		21h		; DOS -	2+ - ADJUST MEMORY BLOCK SIZE (SETBLOCK)
 					; ES = segment address of block	to change
 					; BX = new size	in paragraphs
@@ -125,6 +131,8 @@ fileOpen:
 REPT NUMBUF
 	call LoadBuffer
 ENDM
+	; Reset ending-flag because we haven't even started yet.
+	mov cs:[ending], 0
 
 	; Get PIC into auto-EOI mode
 	call GetMachineType
@@ -143,25 +151,33 @@ ENDM
 	;out		dx, al
 	
 	;call InitPCSpeaker
-	call InitPCjrAudio
+	;call InitPCjrAudio
 	
 	; Init OPL2
-	mov dx, 0388h
+	;mov dx, 0388h
+	;mov cx, 0F5h
+	; Set all registers to 0
+;@@regLoop:
+	;mov al, cl
+	;out	dx, al
+;rept 6
+    ;in      al,dx
+;endm
+    ;inc     dx
+	;xor ax, ax
+	;out	dx, al
+;rept 35
+    ;in      al,dx
+;endm
+	;dec dx
+	;loop @@regLoop
+	
+	; Init OPL2LPT
 	mov cx, 0F5h
 	; Set all registers to 0
 @@regLoop:
-	mov al, cl
-	out	dx, al
-rept 6
-    in      al,dx
-endm
-    inc     dx
-	xor ax, ax
-	out	dx, al
-rept 35
-    in      al,dx
-endm
-	dec dx
+	WriteOPL2LPTAddr LPT_BASE, cl
+	WriteOPL2LPTData LPT_BASE, 0
 	loop @@regLoop
 
 	; Install our own handler	
@@ -359,7 +375,7 @@ waitKey2:
 	mov cl, [machineType]
 	call RestorePIC
 	;call ClosePCSpeaker
-	call ClosePCjrAudio
+	;call ClosePCjrAudio
 	
 	; Free sample buffer
 	mov es, [sampleBufSeg]
@@ -444,32 +460,43 @@ sampleBufIns:
 	xor cx, cx
 	mov cl, al
 	
+	push bx
 	push dx
-	mov dx, 0388h
-	
-	jmp enterLoop
-	
+;	mov dx, 0388h
+;	
+;	jmp enterLoop
+;	
+;noteLoop:
+;rept 35
+;    in      al,dx
+;endm
+;	dec dx
+
+;enterLoop:
+;	segcs lodsb
+;	out	dx,al
+;rept 6
+;    in      al,dx
+;endm
+
+;    inc     dx
+;	segcs lodsb
+;	out	dx,al
+
 noteLoop:
-rept 35
-    in      al,dx
-endm
-	dec dx
-
-enterLoop:
 	segcs lodsb
-	out	dx,al
-rept 6
-    in      al,dx
-endm
-
-    inc     dx
+	xchg ax, bx
+	WriteOPL2LPTAddr LPT_BASE, bl
+	
 	segcs lodsb
-	out	dx,al
+	xchg ax, bx
+	WriteOPL2LPTData LPT_BASE, bl
 
 	loop noteLoop
-	
+
 	pop dx		
 	pop cx
+	pop bx
 		
 endHandler:
 	; Get delay value from stream
