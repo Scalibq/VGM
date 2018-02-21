@@ -7,11 +7,12 @@ include 8253.inc
 include 8259A.inc
 include LPT.inc
 include OPL2LPT.inc
+include DBS2P.inc
 
 BUFSIZE equ 32768
 NUMBUF equ 1
 
-LPT_BASE equ 03BCh
+LPT_BASE equ 0378h
 
 PreHeader struc
 	marker 		db 4 dup(?)	; = {'P','r','e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
@@ -171,6 +172,8 @@ ENDM
 ;endm
 	;dec dx
 	;loop @@regLoop
+
+; =======================
 	
 	; Init OPL2LPT
 	mov cx, 0F5h
@@ -179,6 +182,15 @@ ENDM
 	WriteOPL2LPTAddr LPT_BASE, cl
 	WriteOPL2LPTData LPT_BASE, 0
 	loop @@regLoop
+	
+; ========================
+
+	; Init DBS2P
+	; Enable parallel mode
+	WriteDBS2PCtrl LPT_BASE, 3Fh
+	
+	; Discard reply byte
+	ReadDBS2PData LPT_BASE
 
 	; Install our own handler	
 	cli
@@ -483,15 +495,24 @@ sampleBufIns:
 ;	segcs lodsb
 ;	out	dx,al
 
+; ======================
+;noteLoop:
+	;segcs lodsb
+	;xchg ax, bx
+	;WriteOPL2LPTAddr LPT_BASE, bl
+	
+	;segcs lodsb
+	;xchg ax, bx
+	;WriteOPL2LPTData LPT_BASE, bl
+
+	;loop noteLoop
+; ======================
+
 noteLoop:
 	segcs lodsb
 	xchg ax, bx
-	WriteOPL2LPTAddr LPT_BASE, bl
+	WriteDBS2PData LPT_BASE, bl
 	
-	segcs lodsb
-	xchg ax, bx
-	WriteOPL2LPTData LPT_BASE, bl
-
 	loop noteLoop
 
 	pop dx		
