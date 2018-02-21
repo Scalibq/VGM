@@ -486,7 +486,7 @@ sampleBufIns:
 	; Get note count
 	segcs lodsb
 	test al, al
-	jz endHandler
+	jz endHandler1
 		
 	; Play notes
 	push cx
@@ -495,20 +495,44 @@ sampleBufIns:
 	
 	;push bx
 	push dx
-	mov dx, 0388h
+	;mov dx, 0388h
 	
-	jmp enterLoop
+	;jmp enterLoop
 	
-noteLoop:
-rept 35
+;noteLoop:
+;rept 35
+    ;in      al,dx
+;endm
+	;dec dx
+
+;enterLoop:
+	;segcs lodsb
+	;out	dx,al
+;rept 6
+    ;in      al,dx
+;endm
+
+    ;inc     dx
+	;segcs lodsb
+	;out	dx,al
+	
+	;loop noteLoop
+	
+; ======================
+	mov dx, 0220h
+	
+	jmp enterLoop1
+	
+noteLoop1:
+rept 3
     in      al,dx
 endm
 	dec dx
 
-enterLoop:
+enterLoop1:
 	segcs lodsb
 	out	dx,al
-rept 6
+rept 3
     in      al,dx
 endm
 
@@ -516,7 +540,46 @@ endm
 	segcs lodsb
 	out	dx,al
 	
-	loop noteLoop
+	loop noteLoop1
+	
+	pop dx	
+	pop cx
+	
+	; Get note count
+endHandler1:
+	segcs lodsb
+	test al, al
+	jz endHandler
+		
+	; Play notes
+	push cx
+	xor cx, cx
+	mov cl, al
+	
+	push dx
+	
+	mov dx, 0222h
+	
+	jmp enterLoop2
+	
+noteLoop2:
+rept 3
+    in      al,dx
+endm
+	dec dx
+
+enterLoop2:
+	segcs lodsb
+	out	dx,al
+rept 3
+    in      al,dx
+endm
+
+    inc     dx
+	segcs lodsb
+	out	dx,al
+	
+	loop noteLoop2
 
 ; ======================
 ;noteLoop:
