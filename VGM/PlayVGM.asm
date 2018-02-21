@@ -32,57 +32,78 @@ LOCALS @@
 
 .stack 100h
 
-.data?
-preHeader PreHeader <>
-_cmdline		CMDLINE	<>
-
 .code
 start:
-	; Retrieve filename from commandline
+	; Retrieve commandline
     ; At program start, DOS sets DS to point to the the PSP.
-    mov     bl, ds:[80h]             ;get length of command-line
-    cmp     bl, 0                    ;is it empty?
-    jne     getfname                 ;if not, get filename; else, abort
+	; Set ES to PSP
+	push	ds
+	pop		es
+	
+	; Set DS to data segment
+	mov		ax, @data
+	mov		ds, ax
+	
+	; Set si to cmdline struct
+	mov		si, offset _cmdline
+	
+	call	GetCmdLine
+
+	; Verify commandline
+	cmp		ds:[_cmdline.argc], 0
+    jne     @@getfname                 ;if not, get filename; else, abort
 
     ; Print usage message, then exit
-	; Set DS to .data
-	mov ax, @data
-	mov ds, ax
     mov     ah, 9
     mov     dx, offset usageSt
     int     21h
     mov     ax, 4C00h
     int     21h
 
-	; Retrieve filename from PSP
-getfname:
-	push es
+	; Retrieve filename from commandline
+@@getfname:
+	mov		si, [_cmdline.argv]
+	mov		cx, [_cmdline.argv][2]
+	sub		cx, si	; Calculate string length
+	dec		cx		; Remove space
+	mov		di, offset fileName
 
-    mov     ax, @data
-    mov     es, ax                   ;es = data segment, ds = psp
-    mov     ax, ds
-    mov     es:[PSP], ax             ;store PSP to data var just in case
-    xor     cx, cx
-    mov     cl, 80h                  ;grab length of filename
-    dec     cl                       ;adjust for skipping leading space
-    mov     si, 82h                  ;ds:si = name start (skip lead spc)
-    mov     di, offset fileName      ;es:di = our filename var
-@getf:
-	lodsb
-    cmp     al, ' '                   ;is it a space? (ie. more on cmdline)
-    je      @abort                  ;abort if it is
-    cmp     al, 0dh                  ;is it ENTER?
-    je      @abort                  ;abort if it is
-    stosb                           ;otherwise, store it to our var
-    loop    @getf
-@abort:
-
-	pop es
-	push es
-
-	; Set DS to .data
-	mov ax, @data
-	mov ds, ax
+	; Swap PSP to DS and @data to ES
+	push	es
+	push	ds
+	pop		es
+	pop		ds
+	
+	rep		movsb	; Copy string to target variable
+	xor		ax, ax
+	stosb			; Add zero-terminator
+	
+	; Retrieve sample rate from commandline
+	;cmp		es:[_cmdline.argc], 2
+	;jb		@@endCmdLine
+	
+	;mov		si, es:[_cmdline.argv][2]
+	;call	ParseDec
+	
+	; Sample rate is in Hz, convert to PIT ticks
+	;mov		dx, (PITFREQ SHR 16)
+	;mov		ax, (PITFREQ AND 0FFFFh)
+	;div		bx
+	;mov		es:[speed], ax
+	
+	;cmp		es:[_cmdline.argc], 3
+	;jb		@@endCmdLine
+	
+	;mov		si, es:[_cmdline.argv][4]
+	;call	ParseHex
+	;mov		word ptr es:[patchPort+1], bx		; Patch LPT1 address into code
+	
+@@endCmdLine:	
+	; Swap @data back to DS and PSP back to ES
+	push	es
+	push	ds
+	pop		es
+	pop		ds
 	
 	; Disable all interrupts except timer and keyboard
 	;in al, PIC1_DATA
@@ -155,42 +176,42 @@ ENDM
 	;call InitPCjrAudio
 	
 	; Init OPL2
-	;mov dx, 0388h
-	;mov cx, 0F5h
+	mov dx, 0388h
+	mov cx, 0F5h
 	; Set all registers to 0
-;@@regLoop:
-	;mov al, cl
-	;out	dx, al
-;rept 6
-    ;in      al,dx
-;endm
-    ;inc     dx
-	;xor ax, ax
-	;out	dx, al
-;rept 35
-    ;in      al,dx
-;endm
-	;dec dx
-	;loop @@regLoop
+@@regLoop:
+	mov al, cl
+	out	dx, al
+rept 6
+    in      al,dx
+endm
+    inc     dx
+	xor ax, ax
+	out	dx, al
+rept 35
+    in      al,dx
+endm
+	dec dx
+	loop @@regLoop
 
 ; =======================
 	
 	; Init OPL2LPT
-	mov cx, 0F5h
+	;mov cx, 0F5h
 	; Set all registers to 0
-@@regLoop:
-	WriteOPL2LPTAddr LPT_BASE, cl
-	WriteOPL2LPTData LPT_BASE, 0
-	loop @@regLoop
+;@@regLoop:
+	;WriteOPL2LPTAddr LPT_BASE, cl
+	;WriteOPL2LPTData LPT_BASE, 0
+	;loop @@regLoop
 	
 ; ========================
 
 	; Init DBS2P
 	; Enable parallel mode
-	WriteDBS2PCtrl LPT_BASE, 3Fh
+	;WriteDBS2PCtrl LPT_BASE, 3Fh
 	
 	; Discard reply byte
-	ReadDBS2PData LPT_BASE
+	;ReadDBS2PData LPT_BASE
 
 	; Install our own handler	
 	cli
@@ -227,7 +248,7 @@ ENDM
 	sti
 	
 mainloop:
-	; Check if we need to mix anything
+	; Check if we need to buffer anything
 sampleBufCheck:
 	mov ax, word ptr es:[sampleBufIns+1+32768]
 	
@@ -472,28 +493,30 @@ sampleBufIns:
 	xor cx, cx
 	mov cl, al
 	
-	push bx
+	;push bx
 	push dx
-;	mov dx, 0388h
-;	
-;	jmp enterLoop
-;	
-;noteLoop:
-;rept 35
-;    in      al,dx
-;endm
-;	dec dx
+	mov dx, 0388h
+	
+	jmp enterLoop
+	
+noteLoop:
+rept 35
+    in      al,dx
+endm
+	dec dx
 
-;enterLoop:
-;	segcs lodsb
-;	out	dx,al
-;rept 6
-;    in      al,dx
-;endm
+enterLoop:
+	segcs lodsb
+	out	dx,al
+rept 6
+    in      al,dx
+endm
 
-;    inc     dx
-;	segcs lodsb
-;	out	dx,al
+    inc     dx
+	segcs lodsb
+	out	dx,al
+	
+	loop noteLoop
 
 ; ======================
 ;noteLoop:
@@ -508,15 +531,15 @@ sampleBufIns:
 	;loop noteLoop
 ; ======================
 
-noteLoop:
-	segcs lodsb
-	xchg ax, bx
-	WriteDBS2PData LPT_BASE, bl
+;noteLoop:
+;	segcs lodsb
+;	xchg ax, bx
+;	WriteDBS2PData LPT_BASE, bl
 	
-	loop noteLoop
+;	loop noteLoop
 
 	pop dx		
-	pop bx
+;	pop bx
 	pop cx
 		
 endHandler:
@@ -633,13 +656,13 @@ file dw ?
 .data
 usageSt db "Usage: PlayVGM <filename.ext>",0dh,0ah,'$'
 errorFile db "Unable to open file!",0dh,0ah,'$'
-;fileName db "out.pre",0
-fileName  db 126 DUP (0)
 
 .data?  
 picMask		db	?
 machineType	db	?
 sampleBufSeg	dw	?
-PSP             dw      ?
+preHeader PreHeader <>
+_cmdline		CMDLINE	<>
+fileName  db 126 DUP (?)
 
 END start
