@@ -1914,7 +1914,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	printf("Division: %u\n", header.division);
 	
 	// If this is not a quarter-note divider, but rather SMPTE, we don't support it yet
-	if (header.division & 0xF000)
+	if (header.division & 0x8000)
 	{
 		printf("Unsupported SMPTE time detected.\n");
 		
