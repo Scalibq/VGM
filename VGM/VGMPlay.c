@@ -21,9 +21,9 @@
 
 //#define MPU401
 //#define IMFC
-//#define SB
-#define DBS2P
-#define OPL2LPT
+#define SB
+//#define DBS2P
+//#define OPL2LPT
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -2818,10 +2818,23 @@ void DeinitKeyHandler(void)
 
 MachineType machineType;
 
-void PlayPoll1(const char* pVGMFile)
+void PrepareFile(const char* pVGMFile)
 {
 	FILE* pFile;
 	FileType fileType;
+	char outFile[512] = "";
+	char* pExtension;
+	
+	// Generate .pre filename
+	pExtension = strrchr(pVGMFile, '.');
+	if (pExtension == NULL)
+		strcpy(outFile, pVGMFile);
+	else
+		memcpy(outFile, pVGMFile, pExtension-pVGMFile);
+	
+	strcat(outFile, ".pre");
+
+	printf("Output file: %s\n", outFile);
 	
 	pFile = fopen(pVGMFile, "rb");
 	
@@ -2830,29 +2843,34 @@ void PlayPoll1(const char* pVGMFile)
 	switch (fileType)
 	{
 		case FT_VGMFile:
-			PreProcessVGM(pFile, "out.pre");
+			PreProcessVGM(pFile, outFile);
 			fclose(pFile);
-			LoadPreprocessed("out.pre");
+			LoadPreprocessed(outFile);
 			break;
 		case FT_MIDIFile:
-			PreProcessMIDI(pFile, "out.pre");
+			PreProcessMIDI(pFile, outFile);
 			fclose(pFile);
-			LoadPreprocessed("out.pre");
+			LoadPreprocessed(outFile);
 			break;
 		case FT_PreFile:
 			fclose(pFile);
 			LoadPreprocessed(pVGMFile);
 			break;
 		case FT_DROFile:
-			PreProcessDRO(pFile, "out.pre");
+			PreProcessDRO(pFile, outFile);
 			fclose(pFile);
-			LoadPreprocessed("out.pre");
+			LoadPreprocessed(outFile);
 			break;
 		default:
 			fclose(pFile);
 			printf("Unsupported file!\n");
 			break;
 	}
+}
+
+void PlayPoll1(const char* pVGMFile)
+{
+	PrepareFile(pVGMFile);
 		
 	// Set to rate generator
 	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
@@ -2868,39 +2886,7 @@ void PlayPoll1(const char* pVGMFile)
 
 void PlayPoll2(const char* pVGMFile)
 {
-	FILE* pFile;
-	FileType fileType;
-	
-	pFile = fopen(pVGMFile, "rb");
-	
-	fileType = GetFileType(pFile);
-	
-	switch (fileType)
-	{
-		case FT_VGMFile:
-			PreProcessVGM(pFile, "out.pre");
-			fclose(pFile);
-			LoadPreprocessed("out.pre");
-			break;
-		case FT_MIDIFile:
-			PreProcessMIDI(pFile, "out.pre");
-			fclose(pFile);
-			LoadPreprocessed("out.pre");
-			break;
-		case FT_PreFile:
-			fclose(pFile);
-			LoadPreprocessed(pVGMFile);
-			break;
-		case FT_DROFile:
-			PreProcessDRO(pFile, "out.pre");
-			fclose(pFile);
-			LoadPreprocessed("out.pre");
-			break;
-		default:
-			fclose(pFile);
-			printf("Unsupported file!\n");
-			break;
-	}
+	PrepareFile(pVGMFile);
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
@@ -2922,39 +2908,7 @@ void PlayPoll2(const char* pVGMFile)
 
 void PlayPoll3(const char* pVGMFile)
 {
-	FILE* pFile;
-	FileType fileType;
-	
-	pFile = fopen(pVGMFile, "rb");	
-
-	fileType = GetFileType(pFile);
-	
-	switch (fileType)
-	{
-		case FT_VGMFile:
-			PreProcessVGM(pFile, "out.pre");
-			fclose(pFile);
-			LoadPreprocessed("out.pre");
-			break;
-		case FT_MIDIFile:
-			PreProcessMIDI(pFile, "out.pre");
-			fclose(pFile);
-			LoadPreprocessed("out.pre");
-			break;
-		case FT_PreFile:
-			fclose(pFile);
-			LoadPreprocessed(pVGMFile);
-			break;
-		case FT_DROFile:
-			PreProcessDRO(pFile, "out.pre");
-			fclose(pFile);
-			LoadPreprocessed("out.pre");
-			break;
-		default:
-			fclose(pFile);
-			printf("Unsupported file!\n");
-			break;
-	}
+	PrepareFile(pVGMFile);
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
@@ -2976,43 +2930,13 @@ void PlayPoll3(const char* pVGMFile)
 	
 void PlayInt(const char* pVGMFile)
 {
-	FILE* pFile;
-	FileType fileType;
 	uint8_t mask;
 	uint16_t far* pW;
 	
-	// Int-based replay
-	pFile = fopen(pVGMFile, "rb");	
+	PrepareFile(pVGMFile);
 
-	fileType = GetFileType(pFile);
 	
-	switch (fileType)
-	{
-		case FT_VGMFile:
-			PreProcessVGM(pFile, "out.pre");
-			fclose(pFile);
-			LoadPreprocessed("out.pre");
-			break;
-		case FT_MIDIFile:
-			PreProcessMIDI(pFile, "out.pre");
-			fclose(pFile);
-			LoadPreprocessed("out.pre");
-			break;
-		case FT_PreFile:
-			fclose(pFile);
-			LoadPreprocessed(pVGMFile);
-			break;
-		case FT_DROFile:
-			PreProcessDRO(pFile, "out.pre");
-			fclose(pFile);
-			LoadPreprocessed("out.pre");
-			break;
-		default:
-			fclose(pFile);
-			printf("Unsupported file!\n");
-			break;
-	}
-	
+	// Int-based replay
 	// Setup auto-EOI
 	machineType = GetMachineType();
 	
