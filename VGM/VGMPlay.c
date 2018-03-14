@@ -307,9 +307,16 @@ void InitDBS2P(uint16_t base)
 	// Perform MT-32 mode for DreamBlaster S2(P)
 	if (mt32Mode)
 	{
+		uint16_t i;
+
 		// Insert MT-32 command, CC 0 = 127
 		static uint8_t MT32[] = { CC, 0, 127, PC, 0 };
-		uint16_t i;
+		static uint8_t MT32_PB[] = { 
+			CC, 0x65, 0x00, // 101 00 MSB
+			CC, 0x64, 0x00, // 100 00 LSB
+			CC, 0x06, 0x0C, //  06 12 MSB
+			CC, 0x26, 0x00  //  38 00 LSB
+		};
 		
 		for (i = 0; i < _countof(channelPart); i++)
 		{
@@ -321,6 +328,18 @@ void InitDBS2P(uint16_t base)
 			MT32[4] = channelPart[i].program;
 					
 			OutputMIDI(base, MT32, _countof(MT32));
+		}
+		
+		// Adjust pitch-bend range
+		for (i = 0; i < 16; i++)
+		{
+			// Set proper channel
+			MT32_PB[0] = CC | i;
+			MT32_PB[3] = CC | i;
+			MT32_PB[6] = CC | i;
+			MT32_PB[9] = CC | i;
+			
+			OutputMIDI(base, MT32_PB, _countof(MT32_PB));
 		}
 	}
 }
