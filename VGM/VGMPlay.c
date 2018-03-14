@@ -21,9 +21,9 @@
 
 //#define MPU401
 //#define IMFC
-#define SB
-//#define DBS2P
-//#define OPL2LPT
+//#define SB
+#define DBS2P
+#define OPL2LPT
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -268,6 +268,30 @@ void CloseSB(void)
 	ResetDSP(SBReg[0]);
 }
 
+typedef struct {
+	uint8_t channel;
+	uint8_t program;
+} ChannelProgram;
+
+ChannelProgram channelPart[] = {
+	{ 2, 68 },
+	{ 3, 48 },
+	{ 4, 95 },
+	{ 5, 78 },
+	{ 6, 41 },
+	{ 7, 3 },
+	{ 8, 110 },
+	{ 9, 122 },
+	{ 10, 127 },
+	{ 1, 0 },
+	{ 11, 0 },
+	{ 12, 0 },
+	{ 13, 0 },
+	{ 14, 0 },
+	{ 15, 0 },
+	{ 16, 0 }
+};
+
 void InitDBS2P(uint16_t base)
 {
 	volatile uint8_t delay;
@@ -279,6 +303,26 @@ void InitDBS2P(uint16_t base)
 	delay = ReadDBS2PData(base);
 
 	OutputMIDI(base, GMReset, _countof(GMReset));
+	
+	// Perform MT-32 mode for DreamBlaster S2(P)
+	if (mt32Mode)
+	{
+		// Insert MT-32 command, CC 0 = 127
+		static uint8_t MT32[] = { CC, 0, 127, PC, 0 };
+		uint16_t i;
+		
+		for (i = 0; i < _countof(channelPart); i++)
+		{
+			// Set proper channel
+			MT32[0] = CC | (channelPart[i].channel - 1);
+			MT32[3] = PC | (channelPart[i].channel - 1);
+			
+			// Set proper program
+			MT32[4] = channelPart[i].program;
+					
+			OutputMIDI(base, MT32, _countof(MT32));
+		}
+	}
 }
 
 void CloseDBS2P(uint16_t base)
@@ -2158,10 +2202,10 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 				if (mt32Mode && (pData[-1] & 0xF0) == PC)
 				{
 					// Insert MT-32 command, CC 0 = 127
-					static uint8_t MT32[] = { 0xB0, 0, 127 };
+					static uint8_t MT32[] = { CC, 0, 127 };
 
 					// Set proper channel
-					MT32[0] = 0xB0 | (pData[-1] & 0x0F);
+					MT32[0] = CC | (pData[-1] & 0x0F);
 					
 					AddCommandBuffer(0, MIDI, MT32, _countof(MT32), pOut);
 					lastStatus = MT32[0];
