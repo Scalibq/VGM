@@ -14,7 +14,6 @@
 #include "VGMFile.h"
 #include "PreProcess.h"
 
-#define SNFreq 3579540
 #define SampleRate 44100
 
 #define DIVISOR		(55411U)	/* (1193182.0f/44100.0f) * 2048 */
