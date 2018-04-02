@@ -18,6 +18,7 @@
 #include "DBS2P.h"
 #include "OPL2LPT.h"
 #include "Endianness.h"
+#include "PreProcess.h"
 
 //#define MPU401
 //#define IMFC
@@ -37,31 +38,6 @@
 #define GETDELAY(n)	((uint32_t)(n*(uint32_t)DIVISOR) >> DIVISOR_SHIFT)
 //#define GETDELAY(n)	((uint32_t)(((n*(1193182.0/44100.0))+0.5)))
 
-// MIDI is sent at 31250 bits per second
-//in 8-N-1 format, so 1 start bit and 1 stop bit added, no parity, 10 bits total
-// Which is 31250 / 10 = 3125 bytes per second
-#define MIDI_BYTE_DURATION	(PITFREQ/3125)	// About 381 PIT ticks per MIDI byte
-#define INT_OVERHEAD (100)
-#define EPSILON 381
-
-#define	SN76489_COMMAND_DURATION	(12)
-#define	SAA1099_COMMAND_DURATION	(12)
-#define	AY8930_COMMAND_DURATION		(12)
-#define	ADLIB_COMMAND_DURATION		(250)
-#define	OPL3_COMMAND_DURATION		(125)
-
-// Index for each sound chip in a command stream
-#define SN76489 0
-#define SAA1099 1
-#define AY8930 2
-#define YM3812 3
-#define YMF262PORT0 4
-#define YMF262PORT1 5
-#define MIDI 6
-
-#define NUM_CHIPS 7
-#define MAX_MULTICHIP 2
-
 uint16_t SNReg[MAX_MULTICHIP] = { 0xC0, 0xC0 };
 uint16_t SAAReg[MAX_MULTICHIP] = { 0x210, 0x212 };
 uint16_t AYReg[MAX_MULTICHIP] = { 0x220, 0x220 };
@@ -73,34 +49,6 @@ uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 
 uint16_t lpt = 0x378;
 uint8_t mt32Mode = 0;	// Special mode to prefix any program change with a special command for DreamBlaster S2(P) for MT-32 instruments
-
-typedef struct _PreHeader
-{
-	char marker[4];				// = {'P','r','e','V'}; // ("Pre-processed VGM"? No idea, just 4 characters to detect that this is one of ours)
-	uint32_t headerLen;			// = sizeof(_PreHeader); // Good MS-custom: always store the size of the header in your file, so you can add extra fields to the end later
-	uint32_t size;				// Amount of data after header
-	uint32_t loop;				// Offset in file to loop to
-	uint8_t version;			// Including a version number may be a good idea
-	uint8_t nrOfSN76489;
-	uint8_t nrOfSAA1099;
-	uint8_t nrOfAY8930;
-	uint8_t nrOfYM3812;
-	uint8_t nrOfYMF262;
-	uint8_t nrOfMIDI;
-} PreHeader;
-
-PreHeader preHeader = {
-	{'P','r','e','V'},	// marker
-	sizeof(PreHeader),	// headerLen
-	0,					// size
-	0x01,				// version
-	0,					// nrOfSN76489;
-	0,					// nrOfSAA1099;
-	0,					// nrOfAY8930;
-	0,					// nrOfYM3812;
-	0,					// nrOfYMF262;
-	0,					// nrOfMIDI;
-};
 
 void SetTimerCount(uint16_t rate);
 
@@ -1221,185 +1169,6 @@ void PlayImmediate(const char* pVGMFile)
 	printf("Done playing VGM\n");
 }
 
-void SavePreprocessed(const char* pFileName);
-
-uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][510];	// We currently support a max count of 255 commands, and largest is 2 byte commands
-uint8_t* pCommands[MAX_MULTICHIP][NUM_CHIPS];
-
-uint16_t GetCommandLengthCount(uint16_t chip, uint16_t type, uint16_t *pLength)
-{
-	uint16_t count;
-	uint16_t length = pCommands[chip][type] - commands[chip][type];
-	if (pLength != NULL)
-		*pLength = length;
-	
-	count = length - 1;
-	
-	// Adjust count for chips that need multiple bytes per command
-	switch (type)
-	{
-		case SAA1099:
-		case AY8930:
-		case YM3812:
-		case YMF262PORT0:
-		case YMF262PORT1:
-			count >>= 1;
-			break;
-	}
-
-	return count;	
-}
-
-void OutputCommands(FILE* pOut)
-{
-	uint16_t count, length, i;
-
-	for (i = 0; i < preHeader.nrOfSN76489; i++)
-	{
-		count = GetCommandLengthCount(i, SN76489, &length);
-
-		commands[i][SN76489][0] = count;
-		fwrite(commands[i][SN76489], length, 1, pOut);
-	}
-		
-	for (i = 0; i < preHeader.nrOfSAA1099; i++)
-	{
-		count = GetCommandLengthCount(i, SAA1099, &length);
-
-		commands[i][SAA1099][0] = count;
-		fwrite(commands[i][SAA1099], length, 1, pOut);
-	}
-				
-	for (i = 0; i < preHeader.nrOfAY8930; i++)
-	{
-		count = GetCommandLengthCount(i, AY8930, &length);
-
-		commands[i][AY8930][0] = count;
-		fwrite(commands[i][AY8930], length, 1, pOut);
-	}
-
-	for (i = 0; i < preHeader.nrOfYM3812; i++)
-	{
-		count = GetCommandLengthCount(i, YM3812, &length);
-
-		commands[i][YM3812][0] = count;
-		fwrite(commands[i][YM3812], length, 1, pOut);
-	}
-
-	for (i = 0; i < preHeader.nrOfYMF262; i++)
-	{
-		// First port 0 commands
-		count = GetCommandLengthCount(i, YMF262PORT0, &length);
-
-		commands[i][YMF262PORT0][0] = count;
-		fwrite(commands[i][YMF262PORT0], length, 1, pOut);
-
-		// Then port 1 commands
-		count = GetCommandLengthCount(i, YMF262PORT1, &length);
-
-		commands[i][YMF262PORT1][0] = count;
-		fwrite(commands[i][YMF262PORT1], length, 1, pOut);
-	}
-	
-	for (i = 0; i < preHeader.nrOfMIDI; i++)
-	{
-		count = GetCommandLengthCount(i, MIDI, &length);
-	
-		commands[i][MIDI][0] = count;
-		fwrite(commands[i][MIDI], length, 1, pOut);
-	}
-}
-
-void ClearCommands(void)
-{
-	uint16_t i, j;
-	
-	for (i = 0; i < MAX_MULTICHIP; i++)
-		for (j = 0; j < NUM_CHIPS; j++)
-			pCommands[i][j] = commands[i][j] + 1;
-}
-
-void AddCommand(uint16_t chip, uint16_t type, uint8_t cmd, FILE *pOut)
-{
-	uint8_t count = GetCommandLengthCount(chip, type, NULL);
-	
-	// If we exceed 255 commands, we need to flush, because we cannot handle more commands
-	if (count >= 255)
-	{
-		uint8_t firstDelay = 1;
-		
-		// First write delay value
-		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-				
-		// Now output commands
-		OutputCommands(pOut);
-		ClearCommands();
-	}
-	
-	// Add new command
-	*pCommands[chip][type]++ = cmd;
-}
-
-void AddCommandMulti(uint16_t chip, uint16_t type, uint8_t cmd1, uint8_t cmd2, FILE *pOut)
-{
-	uint8_t count = GetCommandLengthCount(chip, type, NULL);
-	
-	// If we exceed 255 commands, we need to flush, because we cannot handle more commands
-	if (count >= 255)
-	{
-		uint8_t firstDelay = 1;
-		
-		// First write delay value
-		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-				
-		// Now output commands
-		OutputCommands(pOut);
-		ClearCommands();
-	}
-	
-	// Add new command
-	*pCommands[chip][type]++ = cmd1;
-	*pCommands[chip][type]++ = cmd2;
-}
-
-void AddCommandBuffer(uint16_t chip, uint16_t type, uint8_t far* pCmds, uint16_t length, FILE *pOut)
-{
-	uint16_t i;
-	
-	for (i = 0; i < length; i++)
-		AddCommand(chip, type, pCmds[i], pOut);
-}
-
-void AddDelay(uint32_t delay, FILE *pOut)
-{
-	// Break up into multiple delays with no notes
-	while (delay > 0)
-	{
-		uint16_t firstDelay;
-		
-		if (delay >= 65536L)
-		{
-			firstDelay = 0;
-			delay -= 65536L;
-		}
-		else
-		{
-			firstDelay = delay;
-			delay = 0;
-		}
-	
-		// First write delay value
-		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
-		
-		// Now output commands
-		OutputCommands(pOut);
-		
-		// Reset command buffers
-		// (Next delays will get 0 notes exported
-		ClearCommands();
-	}
-}
-
 typedef enum
 {
 	FT_Unknown,
@@ -2442,20 +2211,6 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 	fclose(pOut);
 	
 	printf("Done preprocessing DRO\n");		
-}
-
-void SavePreprocessed(const char* pFileName)
-{
-	FILE* pFile = fopen(pFileName, "wb");
-
-	preHeader.size = ((uint32_t)pEndBuf-(uint32_t)pPreprocessed);
-	
-	printf("Preprocessed size: %lu\n", preHeader.size);
-	
-	// Save to file
-	_farfwrite(&preHeader, sizeof(preHeader), 1, pFile);	
-	_farfwrite(pPreprocessed, preHeader.size, 1, pFile);
-	fclose(pFile);
 }
 
 void LoadPreprocessed(const char* pFileName)
