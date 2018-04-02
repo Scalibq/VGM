@@ -131,10 +131,10 @@ void PlayData(void)
 		while (count--)
 		{
 			outp(OPL3Reg[i*2], *pBuf++);
-			for (j = 0; j < 3; j++)
+			for (j = 0; j < 6; j++)
 				delay = inp(OPL3Reg[i*2]);
 			outp(OPL3Reg[i*2]+1, *pBuf++);
-			for (j = 0; j < 3; j++)
+			for (j = 0; j < 35; j++)
 				delay = inp(OPL3Reg[i*2]);
 		}
 
@@ -144,10 +144,10 @@ void PlayData(void)
 		while (count--)
 		{
 			outp(OPL3Reg[i*2 + 1], *pBuf++);
-			for (j = 0; j < 3; j++)
+			for (j = 0; j < 6; j++)
 				delay = inp(OPL3Reg[i*2 + 1]);
 			outp(OPL3Reg[i*2 + 1]+1, *pBuf++);
-			for (j = 0; j < 3; j++)
+			for (j = 0; j < 35; j++)
 				delay = inp(OPL3Reg[i*2 + 1]);
 		}
 	}
@@ -582,10 +582,10 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	// Enable OPL3-mode so both ports can be reset
 	// Enable OPL3 mode
 	outp(OPL3Reg[1], 5);
-	for (j = 0; j < 3; j++)
+	for (j = 0; j < 6; j++)
 		delay = inp(OPL3Reg[1]);
 	outp(OPL3Reg[1]+1, 1);
-	for (j = 0; j < 3; j++)
+	for (j = 0; j < 35; j++)
 		delay = inp(OPL3Reg[1]);
 	
 	// Write 0 to all YMF262 registers
@@ -625,18 +625,18 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	// Enable 4-OP mode
 	// Second port
 	outp(OPL3Reg[1], 4);
-	for (j = 0; j < 3; j++)
+	for (j = 0; j < 6; j++)
 		delay = inp(OPL3Reg[1]);
 	outp(OPL3Reg[1]+1, fourOp);
-	for (j = 0; j < 3; j++)
+	for (j = 0; j < 35; j++)
 		delay = inp(OPL3Reg[1]);
 
 	// Enable OPL3 mode
 	outp(OPL3Reg[1], 5);
-	for (j = 0; j < 3; j++)
+	for (j = 0; j < 6; j++)
 		delay = inp(OPL3Reg[1]);
 	outp(OPL3Reg[1]+1, opl3);
-	for (j = 0; j < 3; j++)
+	for (j = 0; j < 35; j++)
 		delay = inp(OPL3Reg[1]);
 }
 
