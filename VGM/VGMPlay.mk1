@@ -55,6 +55,27 @@ I:\Programming\Oldskool\DOS\VGM\PreProcess.obj : I:\Programming\Oldskool\DOS&
  *wcc PreProcess.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq -otex&
 an -ob -ol -ol+ -oc -oi -fpc -bt=dos -fo=.obj -ms
 
+I:\Programming\Oldskool\DOS\VGM\PreProcessDRO.obj : I:\Programming\Oldskool\&
+DOS\VGM\PreProcessDRO.c .AUTODEPEND
+ @I:
+ cd I:\Programming\Oldskool\DOS\VGM
+ *wcc PreProcessDRO.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq -o&
+texan -ob -ol -ol+ -oc -oi -fpc -bt=dos -fo=.obj -ms
+
+I:\Programming\Oldskool\DOS\VGM\PreProcessMIDI.obj : I:\Programming\Oldskool&
+\DOS\VGM\PreProcessMIDI.c .AUTODEPEND
+ @I:
+ cd I:\Programming\Oldskool\DOS\VGM
+ *wcc PreProcessMIDI.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq -&
+otexan -ob -ol -ol+ -oc -oi -fpc -bt=dos -fo=.obj -ms
+
+I:\Programming\Oldskool\DOS\VGM\PreProcessVGM.obj : I:\Programming\Oldskool\&
+DOS\VGM\PreProcessVGM.c .AUTODEPEND
+ @I:
+ cd I:\Programming\Oldskool\DOS\VGM
+ *wcc PreProcessVGM.c -i="I:\WATCOM/h" -i="../COMMON/C" -w4 -e25 -zp1 -zq -o&
+texan -ob -ol -ol+ -oc -oi -fpc -bt=dos -fo=.obj -ms
+
 I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj : I:\Programming\Oldskool\DOS\VG&
 M\VGMPlay.c .AUTODEPEND
  @I:
@@ -67,20 +88,24 @@ M\8259A.obj I:\Programming\Oldskool\DOS\VGM\COMMON.obj I:\Programming\Oldsko&
 ol\DOS\VGM\DBS2P.obj I:\Programming\Oldskool\DOS\VGM\IMFC.obj I:\Programming&
 \Oldskool\DOS\VGM\MPU401.obj I:\Programming\Oldskool\DOS\VGM\OPL2LPT.obj I:\&
 Programming\Oldskool\DOS\VGM\SB.obj I:\Programming\Oldskool\DOS\VGM\PreProce&
-ss.obj I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj I:\Programming\Oldskool\D&
-OS\COMMON\C\8253.h I:\Programming\Oldskool\DOS\COMMON\C\8259A.H I:\Programmi&
-ng\Oldskool\DOS\COMMON\C\COMMON.H I:\Programming\Oldskool\DOS\COMMON\C\DBS2P&
-.h I:\Programming\Oldskool\DOS\COMMON\C\IMFC.h I:\Programming\Oldskool\DOS\C&
-OMMON\C\LPT.h I:\Programming\Oldskool\DOS\COMMON\C\MPU401.h I:\Programming\O&
-ldskool\DOS\COMMON\C\OPL2LPT.h I:\Programming\Oldskool\DOS\COMMON\C\SB.h I:\&
-Programming\Oldskool\DOS\COMMON\C\stdtype.h I:\Programming\Oldskool\DOS\COMM&
-ON\C\TYPES.H I:\Programming\Oldskool\DOS\COMMON\C\VGMFile.h I:\Programming\O&
-ldskool\DOS\VGM\DRO.h I:\Programming\Oldskool\DOS\VGM\PreProcess.h .AUTODEPE&
-ND
+ss.obj I:\Programming\Oldskool\DOS\VGM\PreProcessDRO.obj I:\Programming\Olds&
+kool\DOS\VGM\PreProcessMIDI.obj I:\Programming\Oldskool\DOS\VGM\PreProcessVG&
+M.obj I:\Programming\Oldskool\DOS\VGM\VGMPlay.obj I:\Programming\Oldskool\DO&
+S\COMMON\C\8253.h I:\Programming\Oldskool\DOS\COMMON\C\8259A.H I:\Programmin&
+g\Oldskool\DOS\COMMON\C\COMMON.H I:\Programming\Oldskool\DOS\COMMON\C\DBS2P.&
+h I:\Programming\Oldskool\DOS\COMMON\C\IMFC.h I:\Programming\Oldskool\DOS\CO&
+MMON\C\LPT.h I:\Programming\Oldskool\DOS\COMMON\C\MPU401.h I:\Programming\Ol&
+dskool\DOS\COMMON\C\OPL2LPT.h I:\Programming\Oldskool\DOS\COMMON\C\SB.h I:\P&
+rogramming\Oldskool\DOS\COMMON\C\stdtype.h I:\Programming\Oldskool\DOS\COMMO&
+N\C\TYPES.H I:\Programming\Oldskool\DOS\COMMON\C\VGMFile.h I:\Programming\Ol&
+dskool\DOS\VGM\DRO.h I:\Programming\Oldskool\DOS\VGM\PreProcess.h I:\Program&
+ming\Oldskool\DOS\VGM\PreProcessDRO.h I:\Programming\Oldskool\DOS\VGM\PrePro&
+cessMIDI.h I:\Programming\Oldskool\DOS\VGM\PreProcessVGM.h .AUTODEPEND
  @I:
  cd I:\Programming\Oldskool\DOS\VGM
  @%write VGMPlay.lk1 FIL 8259A.obj,COMMON.obj,DBS2P.obj,IMFC.obj,MPU401.obj,&
-OPL2LPT.obj,SB.obj,PreProcess.obj,VGMPlay.obj
+OPL2LPT.obj,SB.obj,PreProcess.obj,PreProcessDRO.obj,PreProcessMIDI.obj,PrePr&
+ocessVGM.obj,VGMPlay.obj
  @%append VGMPlay.lk1 
  *wlink name VGMPlay sys dos op m op maxe=25 op q op symf @VGMPlay.lk1
 
