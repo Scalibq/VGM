@@ -584,7 +584,7 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	outp(OPL3Reg[1], 5);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
-	outp(OPL2Reg[1]+1, 1);
+	outp(OPL3Reg[1]+1, 1);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
 	
@@ -627,7 +627,7 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	outp(OPL3Reg[1], 4);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
-	outp(OPL2Reg[1]+1, fourOp);
+	outp(OPL3Reg[1]+1, fourOp);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
 
@@ -635,7 +635,7 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	outp(OPL3Reg[1], 5);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
-	outp(OPL2Reg[1]+1, opl3);
+	outp(OPL3Reg[1]+1, opl3);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
 }
