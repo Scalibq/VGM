@@ -20,14 +20,6 @@
 #include "PreProcessDRO.h"
 #include "PrePlayer.h"
 
-//#define MPU401
-//#define IMFC
-//#define SB
-#define DBS2P
-#define OPL2LPT
-
-#define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
-
 uint16_t lpt = 0x378;
 
 void SetTimerCount(uint16_t rate);
@@ -713,14 +705,14 @@ void SetTimerRate(uint16_t rate)
 	// Reset mode to trigger timer immediately
 	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	
-	outp(0x40, rate);
-	outp(0x40, rate >> 8);
+	outp(CHAN0PORT, rate);
+	outp(CHAN0PORT, rate >> 8);
 }
 
 void SetTimerCount(uint16_t rate)
 {
-	outp(0x40, rate);
-	outp(0x40, rate >> 8);
+	outp(CHAN0PORT, rate);
+	outp(CHAN0PORT, rate >> 8);
 }
 
 void InitHandler(void)
