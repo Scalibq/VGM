@@ -120,8 +120,8 @@ void AddCommand(uint16_t chip, uint16_t type, uint8_t cmd, FILE *pOut)
 {
 	uint16_t count = GetCommandLengthCount(chip, type, NULL);
 	
-	// If we exceed 255 commands, we need to flush, because we cannot handle more commands
-	if (count >= 255)
+	// If we exceed MAX_COMMANDS commands, we need to flush, because we cannot handle more commands
+	if (count >= MAX_COMMANDS)
 	{
 		uint16_t firstDelay = 1;
 		
@@ -141,8 +141,8 @@ void AddCommandMulti(uint16_t chip, uint16_t type, uint8_t cmd1, uint8_t cmd2, F
 {
 	uint16_t count = GetCommandLengthCount(chip, type, NULL);
 	
-	// If we exceed 255 commands, we need to flush, because we cannot handle more commands
-	if (count >= 255)
+	// If we exceed MAX_COMMANDS, we need to flush, because we cannot handle more commands
+	if (count >= MAX_COMMANDS)
 	{
 		uint16_t firstDelay = 1;
 		
