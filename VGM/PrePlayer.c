@@ -125,20 +125,7 @@ void PlayData(void)
 		
 	for (i = 0; i < preHeader.nrOfYMF262; i++)
 	{
-		// First port 0 commands
-		count = *pBuf++;
-			
-		while (count--)
-		{
-			outp(OPL3Reg[i*2], *pBuf++);
-			for (j = 0; j < 6; j++)
-				delay = inp(OPL3Reg[i*2]);
-			outp(OPL3Reg[i*2]+1, *pBuf++);
-			for (j = 0; j < 35; j++)
-				delay = inp(OPL3Reg[i*2]);
-		}
-
-		// Then port 1 commands
+		// First port 1 commands
 		count = *pBuf++;
 			
 		while (count--)
@@ -149,6 +136,19 @@ void PlayData(void)
 			outp(OPL3Reg[i*2 + 1]+1, *pBuf++);
 			for (j = 0; j < 35; j++)
 				delay = inp(OPL3Reg[i*2 + 1]);
+		}
+
+		// Then port 0 commands
+		count = *pBuf++;
+			
+		while (count--)
+		{
+			outp(OPL3Reg[i*2], *pBuf++);
+			for (j = 0; j < 6; j++)
+				delay = inp(OPL3Reg[i*2]);
+			outp(OPL3Reg[i*2]+1, *pBuf++);
+			for (j = 0; j < 35; j++)
+				delay = inp(OPL3Reg[i*2]);
 		}
 	}
 	

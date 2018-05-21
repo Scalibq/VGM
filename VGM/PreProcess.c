@@ -84,17 +84,18 @@ void OutputCommands(FILE* pOut)
 
 	for (i = 0; i < preHeader.nrOfYMF262; i++)
 	{
-		// First port 0 commands
+		// First port 1 commands (includes global OPL3 config registers)
+		count = GetCommandLengthCount(i, YMF262PORT1, &length);
+
+		commands[i][YMF262PORT1][0] = count;
+		fwrite(commands[i][YMF262PORT1], length, 1, pOut);
+		
+		// Then port 0 commands
 		count = GetCommandLengthCount(i, YMF262PORT0, &length);
 
 		commands[i][YMF262PORT0][0] = count;
 		fwrite(commands[i][YMF262PORT0], length, 1, pOut);
 
-		// Then port 1 commands
-		count = GetCommandLengthCount(i, YMF262PORT1, &length);
-
-		commands[i][YMF262PORT1][0] = count;
-		fwrite(commands[i][YMF262PORT1], length, 1, pOut);
 	}
 	
 	for (i = 0; i < preHeader.nrOfMIDI; i++)
