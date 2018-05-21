@@ -22,6 +22,8 @@
 
 #define NUM_CHIPS 7
 #define MAX_MULTICHIP 2
+#define MAX_COMMANDS 255
+#define MAX_COMMAND_SIZE 2
 
 // MIDI is sent at 31250 bits per second
 //in 8-N-1 format, so 1 start bit and 1 stop bit added, no parity, 10 bits total

@@ -4,6 +4,7 @@ PreHeader preHeader = {
 	{'P','r','e','V'},	// marker
 	sizeof(PreHeader),	// headerLen
 	0,					// size
+	0,					// loop
 	0x01,				// version
 	0,					// nrOfSN76489;
 	0,					// nrOfSAA1099;
@@ -18,7 +19,7 @@ PreHeader preHeader = {
 // uint8_t data_count;
 // uint8_t data[data_count]
 
-uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][510];	// We currently support a max count of 255 commands, and largest is 2 byte commands
+uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][(MAX_COMMANDS*MAX_COMMAND_SIZE)+1];	// We currently support a max count of 255 commands, and largest is 2 byte commands, count is stored first
 uint8_t* pCommands[MAX_MULTICHIP][NUM_CHIPS];
 
 uint16_t GetCommandLengthCount(uint16_t chip, uint16_t type, uint16_t *pLength)
@@ -116,12 +117,12 @@ void ClearCommands(void)
 
 void AddCommand(uint16_t chip, uint16_t type, uint8_t cmd, FILE *pOut)
 {
-	uint8_t count = GetCommandLengthCount(chip, type, NULL);
+	uint16_t count = GetCommandLengthCount(chip, type, NULL);
 	
 	// If we exceed 255 commands, we need to flush, because we cannot handle more commands
 	if (count >= 255)
 	{
-		uint8_t firstDelay = 1;
+		uint16_t firstDelay = 1;
 		
 		// First write delay value
 		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
@@ -137,12 +138,12 @@ void AddCommand(uint16_t chip, uint16_t type, uint8_t cmd, FILE *pOut)
 
 void AddCommandMulti(uint16_t chip, uint16_t type, uint8_t cmd1, uint8_t cmd2, FILE *pOut)
 {
-	uint8_t count = GetCommandLengthCount(chip, type, NULL);
+	uint16_t count = GetCommandLengthCount(chip, type, NULL);
 	
 	// If we exceed 255 commands, we need to flush, because we cannot handle more commands
 	if (count >= 255)
 	{
-		uint8_t firstDelay = 1;
+		uint16_t firstDelay = 1;
 		
 		// First write delay value
 		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);

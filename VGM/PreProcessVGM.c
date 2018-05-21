@@ -256,7 +256,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 				break;
 			case 0xAF:	// aa dd : Second YMF262 port 1, write value dd to register aa
 				fread(data, sizeof(data), 1, pFile);
-				AddCommandMulti(1, YMF262PORT0, data[0], data[1], pOut);
+				AddCommandMulti(1, YMF262PORT1, data[0], data[1], pOut);
 				break;
 		
 			case 0x51:	// aa dd : YM2413, write value dd to register aa
@@ -356,7 +356,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	}
 	
 	// Output last delay of 0
-	AddDelay(0, pOut);
+	AddDelay(65536L, pOut);
 	
 	// And a final delay of 0, which would get fetched by the last int handler
 	firstDelay = 0;
