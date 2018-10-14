@@ -98,6 +98,17 @@ start:
 	;call	ParseHex
 	;mov		word ptr es:[patchPort+1], bx		; Patch LPT1 address into code
 	
+	; Retrieve LPT1 address from commandline
+	cmp		es:[_cmdline.argc], 2
+	jb		@@endCmdLine
+	
+	mov		si, es:[_cmdline.argv][2]
+	call	ParseHex
+	inc		bx		; Parameter is base+2
+	inc		bx
+	mov		word ptr es:[patchPort+1], bx		; Patch LPT1 address into code
+	mov		word ptr cs:[patchPort1+1], bx		; Patch LPT1 address into init routine
+	
 @@endCmdLine:	
 	; Swap @data back to DS and PSP back to ES
 	push	es
@@ -176,23 +187,23 @@ ENDM
 	;call InitPCjrAudio
 	
 	; Init OPL2
-	mov dx, 0388h
-	mov cx, 0F5h
-	; Set all registers to 0
-@@regLoop:
-	mov al, cl
-	out	dx, al
-rept 6
-    in      al,dx
-endm
-    inc     dx
-	xor ax, ax
-	out	dx, al
-rept 35
-    in      al,dx
-endm
-	dec dx
-	loop @@regLoop
+;	mov dx, 0388h
+;	mov cx, 0F5h
+;	; Set all registers to 0
+;@@regLoop:
+;	mov al, cl
+;	out	dx, al
+;rept 6
+;    in      al,dx
+;endm
+;    inc     dx
+;	xor ax, ax
+;	out	dx, al
+;rept 35
+;    in      al,dx
+;endm
+;	dec dx
+;	loop @@regLoop
 
 ; =======================
 	
@@ -208,10 +219,12 @@ endm
 
 	; Init DBS2P
 	; Enable parallel mode
-	;WriteDBS2PCtrl LPT_BASE, 3Fh
+patchPort1:
+	mov dx, LPT_BASE+2
+	WriteDBS2PCtrlReg 3Fh
 	
 	; Discard reply byte
-	;ReadDBS2PData LPT_BASE
+	ReadDBS2PDataReg
 
 	; Install our own handler	
 	cli
@@ -486,14 +499,14 @@ sampleBufIns:
 	; Get note count
 	segcs lodsb
 	test al, al
-	jz endHandler1
+	jz endHandler
 		
 	; Play notes
 	push cx
 	xor cx, cx
 	mov cl, al
 	
-	;push bx
+	push bx
 	push dx
 	;mov dx, 0388h
 	
@@ -518,91 +531,32 @@ sampleBufIns:
 	
 	;loop noteLoop
 	
-; ======================
-	mov dx, 0220h
-	
-	jmp enterLoop1
-	
-noteLoop1:
-rept 3
-    in      al,dx
-endm
-	dec dx
-
-enterLoop1:
-	segcs lodsb
-	out	dx,al
-rept 3
-    in      al,dx
-endm
-
-    inc     dx
-	segcs lodsb
-	out	dx,al
-	
-	loop noteLoop1
-	
-	pop dx	
-	pop cx
-	
-	; Get note count
-endHandler1:
-	segcs lodsb
-	test al, al
-	jz endHandler
-		
-	; Play notes
-	push cx
-	xor cx, cx
-	mov cl, al
-	
-	push dx
-	
-	mov dx, 0222h
-	
-	jmp enterLoop2
-	
-noteLoop2:
-rept 3
-    in      al,dx
-endm
-	dec dx
-
-enterLoop2:
-	segcs lodsb
-	out	dx,al
-rept 3
-    in      al,dx
-endm
-
-    inc     dx
-	segcs lodsb
-	out	dx,al
-	
-	loop noteLoop2
 
 ; ======================
-;noteLoop:
-	;segcs lodsb
-	;xchg ax, bx
-	;WriteOPL2LPTAddr LPT_BASE, bl
-	
-	;segcs lodsb
-	;xchg ax, bx
-	;WriteOPL2LPTData LPT_BASE, bl
-
-	;loop noteLoop
-; ======================
-
 ;noteLoop:
 ;	segcs lodsb
 ;	xchg ax, bx
-;	WriteDBS2PData LPT_BASE, bl
+;	WriteOPL2LPTAddr LPT_BASE, bl
 	
-;	loop noteLoop
+;	segcs lodsb
+;	xchg ax, bx
+;	WriteOPL2LPTData LPT_BASE, bl
 
-	pop dx		
-;	pop bx
+;	loop noteLoop
+; ======================
+
+patchPort:
+	mov dx, LPT_BASE+2
+
+noteLoop:
+	segcs lodsb
+	xchg ax, bx
+	WriteDBS2PDataReg bl
+	
+	loop noteLoop
+
+	pop dx
+	pop bx
 	pop cx
 		
 endHandler:
