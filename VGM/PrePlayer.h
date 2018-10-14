@@ -2,9 +2,9 @@
 #define _PREPLAYER_H_
 
 //#define MPU401
-#define IMFC
+//#define IMFC
 //#define SB
-//#define DBS2P
+#define DBS2P
 //#define OPL2LPT
 
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr

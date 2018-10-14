@@ -29,6 +29,8 @@ uint16_t MPUReg[MAX_MULTICHIP] = { 0x330, 0x330 };
 uint16_t IMFCReg[MAX_MULTICHIP] = { 0x2A20, 0x2A20 };
 uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 
+extern uint16_t lpt;
+
 // Buffer format:
 // uint16_t delay;
 // uint8_t data_count;
@@ -236,6 +238,8 @@ void CloseMPU401(void)
 
 void InitIMFCAll(void)
 {
+	static uint8_t SetConfig[] = { 0xF0, 0x43, 0x75, 0x00, 0x10, 0x22, 17, 0xF7 };
+	
 	uint8_t c;
 	
 	InitIMFC(IMFCReg[0], IMFC_MUSIC_MODE);
@@ -257,7 +261,8 @@ void InitIMFCAll(void)
 		WriteDataToIMFC(IMFCReg[0], 120);
 	}
 	
-	OutputMIDI(IMFCReg[0], GMReset, _countof(GMReset));
+	// Set MONO 8 configuration (config 17)
+	OutputMIDI(IMFCReg[0], SetConfig, _countof(SetConfig));
 }
 
 void CloseIMFC(void)
@@ -279,8 +284,6 @@ void CloseIMFC(void)
 		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
 		WriteDataToIMFC(IMFCReg[0], 120);
 	}
-	
-	OutputMIDI(IMFCReg[0], GMReset, _countof(GMReset));
 	
 	// Music Card Message (1e5 - Reboot)
 	//WriteCommandToIMFC(IMFCReg[0], 0xe5);
