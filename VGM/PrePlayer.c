@@ -21,7 +21,7 @@
 #define SNFreq 3579540
 
 uint16_t SNReg[MAX_MULTICHIP] = { 0xC0, 0xC0 };
-uint16_t SAAReg[MAX_MULTICHIP] = { 0x210, 0x212 };
+uint16_t SAAReg[MAX_MULTICHIP] = { 0x240, 0x242 };
 uint16_t AYReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 uint16_t OPL2Reg[MAX_MULTICHIP] = { 0x388, 0x388 };
 uint16_t OPL3Reg[MAX_MULTICHIP*2] = { 0x220, 0x222, 0x220, 0x222 };	// Special case: there are two separate ports for the chip
@@ -430,6 +430,7 @@ void InitPCjrAudio(void)
 	// Audio Multiplexer is Int1A AH=80 AL=Audio source (0=PC speaker, 1=Cassette, 2=I/O channel "Audio In", 3=SN76496).
 	union REGS in, out;
 
+    in.h.ah = 0x80;
 	in.h.al = 3;
 	int86(0x1A, &in, &out);
 }
@@ -452,6 +453,7 @@ void ClosePCjrAudio(void)
 	outp(SNMplxr, mplx);
 	*/
 	// Audio Multiplexer is Int1A AH=80 AL=Audio source (0=PC speaker, 1=Cassette, 2=I/O channel "Audio In", 3=SN76496).
+	in.h.ah = 0x80;
 	in.h.al = 0;
 	int86(0x1A, &in, &out);
 }
