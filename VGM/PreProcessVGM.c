@@ -25,7 +25,9 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	uint16_t firstDelay;
 	uint16_t i;
 	uint8_t playing = 1;
-	
+	uint16_t minutes, seconds, ms;
+	uint32_t duration;
+
 	if (!tableInited)
 		InitDelayTable();
 
@@ -44,10 +46,30 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	printf("Version: %08X\n", header.lngVersion);
 	printf("GD3 Offset: %08X\n", header.lngGD3Offset);
 	printf("Total # samples: %lu\n", header.lngTotalSamples);
+	printf("Loop offset: %08X\n", header.lngLoopOffset + 0x1C);
+	printf("Loop samples: %lu\n", header.lngLoopSamples);
 	printf("Playback Rate: %08X\n", header.lngRate);
 	printf("VGM Data Offset: %08X\n", header.lngDataOffset);
 
-    if (header.lngDataOffset == 0)
+	duration = header.lngTotalSamples;
+	minutes = duration / (44100 * 60);
+	duration -= minutes * (44100 * 60);
+	seconds = duration / 44100;
+	duration -= seconds * 44100;
+	ms = duration / (44100 / 1000);
+
+	printf("Time: %u:%02u.%03u\n", minutes, seconds, ms);
+
+	duration = header.lngLoopSamples;
+	minutes = duration / (44100 * 60);
+	duration -= minutes * (44100 * 60);
+	seconds = duration / 44100;
+	duration -= seconds * 44100;
+	ms = duration / (44100 / 1000);
+
+	printf("Loop: %u:%02u.%03u\n", minutes, seconds, ms);
+
+	if (header.lngDataOffset == 0)
 		dataOffset = 0x40;
 	else
 		dataOffset = header.lngDataOffset + 0x34;

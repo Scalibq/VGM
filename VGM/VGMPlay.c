@@ -668,16 +668,25 @@ void PlayPolled2(void)
 void interrupt (*OldTimerHandler)(void);
 void interrupt (*OldKeyHandler)(void);
 
+uint32_t playTime = 0;
+
 void interrupt HandlerC(void)
 {
 	uint16_t huge* pW;
-	
+	uint16_t delay;
+
 	PlayData();
 
 	// Get delay value from stream
 	pW = (uint16_t huge*)pBuf;
-	SetTimerCount(*pW++);
+	delay = *pW++;
+	SetTimerCount(delay);
 	pBuf = (uint8_t huge*)pW;
+
+	if (delay == 0)
+		playTime += 65536L;
+	else
+		playTime += delay;
 }
 
 void interrupt KeyHandler()
@@ -889,8 +898,19 @@ void PlayInt(const char* pVGMFile)
 	
 	while (playing)
 	{
-		__asm hlt
-		
+		uint16_t minutes, seconds, ms;
+		uint32_t duration = playTime;
+
+		//__asm hlt
+
+		minutes = duration / (PITFREQ * 60L);
+		duration -= minutes * (PITFREQ * 60L);
+		seconds = duration / PITFREQ;
+		duration -= seconds * PITFREQ;
+		ms = duration / (PITFREQ / 1000L);
+
+		printf("\rTime: %u:%02u.%03u", minutes, seconds, ms);
+
 		if (pBuf > pEndBuf)
 			playing = 0;
 	}
