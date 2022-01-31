@@ -23,7 +23,7 @@
 uint16_t SNReg[MAX_MULTICHIP] = { 0xC0, 0xC0 };
 uint16_t SAAReg[MAX_MULTICHIP] = { 0x240, 0x242 };
 uint16_t AYReg[MAX_MULTICHIP] = { 0x220, 0x220 };
-uint16_t OPL2Reg[MAX_MULTICHIP] = { 0x388, 0x388 };
+uint16_t OPL2Reg[MAX_MULTICHIP] = { 0x220, 0x222 };
 uint16_t OPL3Reg[MAX_MULTICHIP*2] = { 0x220, 0x222, 0x220, 0x222 };	// Special case: there are two separate ports for the chip
 uint16_t MPUReg[MAX_MULTICHIP] = { 0x330, 0x330 };
 uint16_t IMFCReg[MAX_MULTICHIP] = { 0x2A20, 0x2A20 };
@@ -123,12 +123,28 @@ void PlayData(void)
 			WriteOPL2LPTAddr(lpt, *pBuf++);
 			WriteOPL2LPTData(lpt, *pBuf++);
 #else
+	/*
 			outp(OPL2Reg[i], *pBuf++);
 			for (j = 0; j < 6; j++)
 				delay = inp(OPL2Reg[i]);
 			outp(OPL2Reg[i]+1, *pBuf++);
 			for (j = 0; j < 35; j++)
 				delay = inp(OPL2Reg[i]);
+			*/
+			uint8_t idx, data;
+			idx = *pBuf++;
+			data = *pBuf++;
+			if (i == 1)
+			{
+				if ((idx == 4) || (idx == 5))
+					continue;
+			}
+			outp(OPL3Reg[i], idx);
+			for (j = 0; j < 6; j++)
+				delay = inp(OPL3Reg[i]);
+			outp(OPL3Reg[i]+1, data);
+			for (j = 0; j < 35; j++)
+				delay = inp(OPL3Reg[i]);
 #endif
 		}
 	}

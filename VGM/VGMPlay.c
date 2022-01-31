@@ -997,7 +997,7 @@ int main(int argc, char* argv[])
 	//InitSamplePIT();
 	
 	ResetYM3812();
-	SetYMF262(0, 0);
+	SetYMF262(1, 0);
 	
 	InitKeyHandler();
 	
