@@ -3,6 +3,15 @@
 uint32_t delayTable[4096];
 uint8_t tableInited = 0;
 
+void SplitTime(uint32_t time, uint16_t* pMinutes, uint16_t* pSeconds, uint16_t* pMillis)
+{
+	*pMillis = time % 1000;
+	time /= 1000;
+	*pSeconds = time % 60;
+	time /= 60;
+	*pMinutes = time;
+}
+
 void InitDelayTable()
 {
 	int i;
@@ -26,7 +35,6 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	uint16_t i;
 	uint8_t playing = 1;
 	uint16_t minutes, seconds, ms;
-	uint32_t duration;
 
 	if (!tableInited)
 		InitDelayTable();
@@ -51,21 +59,11 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	printf("Playback Rate: %08X\n", header.lngRate);
 	printf("VGM Data Offset: %08X\n", header.lngDataOffset);
 
-	duration = header.lngTotalSamples;
-	minutes = duration / (44100 * 60);
-	duration -= minutes * (44100 * 60);
-	seconds = duration / 44100;
-	duration -= seconds * 44100;
-	ms = duration / (44100 / 1000);
+	SplitTime(header.lngTotalSamples / (44100/1000), &minutes, &seconds, &ms);
 
 	printf("Time: %u:%02u.%03u\n", minutes, seconds, ms);
 
-	duration = header.lngLoopSamples;
-	minutes = duration / (44100 * 60);
-	duration -= minutes * (44100 * 60);
-	seconds = duration / 44100;
-	duration -= seconds * 44100;
-	ms = duration / (44100 / 1000);
+	SplitTime(header.lngLoopSamples / (44100/1000), &minutes, &seconds, &ms);
 
 	printf("Loop: %u:%02u.%03u\n", minutes, seconds, ms);
 

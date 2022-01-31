@@ -23,5 +23,6 @@
 //#define GETDELAY(n)	((uint32_t)(((n*(1193182.0/44100.0))+0.5)))
 
 void PreProcessVGM(FILE* pFile, const char* pOutFile);
+void SplitTime(uint32_t time, uint16_t* pMinutes, uint16_t* pSeconds, uint16_t* pMillis);
 
 #endif /* _PREPROCESSVGM_H_ */

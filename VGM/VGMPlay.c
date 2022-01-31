@@ -857,7 +857,7 @@ void PlayPoll3(const char* pVGMFile)
 	
 	RestorePICState(machineType);
 }
-	
+
 void PlayInt(const char* pVGMFile)
 {
 	uint8_t mask;
@@ -899,15 +899,10 @@ void PlayInt(const char* pVGMFile)
 	while (playing)
 	{
 		uint16_t minutes, seconds, ms;
-		uint32_t duration = playTime;
 
 		//__asm hlt
-
-		minutes = duration / (PITFREQ * 60L);
-		duration -= minutes * (PITFREQ * 60L);
-		seconds = duration / PITFREQ;
-		duration -= seconds * PITFREQ;
-		ms = duration / (PITFREQ / 1000L);
+		
+		SplitTime(playTime / (PITFREQ/1000L), &minutes, &seconds, &ms);
 
 		printf("\rTime: %u:%02u.%03u", minutes, seconds, ms);
 
