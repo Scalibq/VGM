@@ -961,6 +961,18 @@ int main(int argc, char* argv[])
 			
 			printf("DreamBlaster S2(P) MT-32 mode enabled.\n");
 		}
+		else if (stricmp(argv[i], "/opl3") == 0)
+		{
+			if (argc >= (i+1))
+			{
+				uint16_t opl3;
+				sscanf(argv[i+1], "%X", &opl3);
+				
+				SetOPL3(opl3);
+				
+				printf("OPL3 address set to: %Xh\n", opl3);
+			}
+		}
 	}
 	
 	InitPCjrAudio();

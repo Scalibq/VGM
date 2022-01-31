@@ -4,7 +4,7 @@
 //#define MPU401
 //#define IMFC
 //#define SB
-#define DBS2P
+//#define DBS2P
 //#define OPL2LPT
 
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
@@ -16,6 +16,8 @@ extern uint8_t huge* pEndBuf;
 void LoadPreprocessed(const char* pFileName);
 void PlayData(void);
 void OutputMIDI(uint16_t base, uint8_t huge* pBuf, uint16_t len);
+
+void SetOPL3(uint16_t base);
 
 void InitMPU401(void);
 void CloseMPU401(void);

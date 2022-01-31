@@ -39,6 +39,14 @@ uint8_t huge* pPreprocessed;
 uint8_t huge* pBuf;
 uint8_t huge* pEndBuf;
 
+void SetOPL3(uint16_t base)
+{
+	OPL3Reg[0] = base;
+	OPL3Reg[1] = base + 2;
+	OPL3Reg[2] = base;
+	OPL3Reg[3] = base + 2;
+}
+
 void LoadPreprocessed(const char* pFileName)
 {
 	FILE* pFile = fopen(pFileName, "rb");
