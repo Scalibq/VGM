@@ -29,7 +29,8 @@ uint16_t MPUReg[MAX_MULTICHIP] = { 0x330, 0x330 };
 uint16_t IMFCReg[MAX_MULTICHIP] = { 0x2A20, 0x2A20 };
 uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x220 };
 
-extern uint16_t lpt;
+uint16_t lpt;
+bool opl322 = false;
 
 // Buffer format:
 // uint16_t delay;
@@ -128,28 +129,33 @@ void PlayData(void)
 			WriteOPL2LPTAddr(lpt, *pBuf++);
 			WriteOPL2LPTData(lpt, *pBuf++);
 #else
-	/*
-			outp(OPL2Reg[i], *pBuf++);
-			for (j = 0; j < 6; j++)
-				delay = inp(OPL2Reg[i]);
-			outp(OPL2Reg[i]+1, *pBuf++);
-			for (j = 0; j < 35; j++)
-				delay = inp(OPL2Reg[i]);
-			*/
-			uint8_t idx, data;
-			idx = *pBuf++;
-			data = *pBuf++;
-			if (i == 1)
+			// OPL3-compatible mode for dual OPL2
+			if (opl322)
 			{
-				if ((idx == 4) || (idx == 5))
-					continue;
+				uint8_t idx, data;
+				idx = *pBuf++;
+				data = *pBuf++;
+				if (i == 1)
+				{
+					if ((idx == 4) || (idx == 5))
+						continue;
+				}
+				outp(OPL3Reg[i], idx);
+				for (j = 0; j < 3; j++)
+					delay = inp(OPL3Reg[i]);
+				outp(OPL3Reg[i]+1, data);
+				for (j = 0; j < 3; j++)
+					delay = inp(OPL3Reg[i]);
 			}
-			outp(OPL3Reg[i], idx);
-			for (j = 0; j < 3; j++)
-				delay = inp(OPL3Reg[i]);
-			outp(OPL3Reg[i]+1, data);
-			for (j = 0; j < 3; j++)
-				delay = inp(OPL3Reg[i]);
+			else
+			{
+				outp(OPL2Reg[i], *pBuf++);
+				for (j = 0; j < 6; j++)
+					delay = inp(OPL2Reg[i]);
+				outp(OPL2Reg[i]+1, *pBuf++);
+				for (j = 0; j < 35; j++)
+					delay = inp(OPL2Reg[i]);
+			}
 #endif
 		}
 	}

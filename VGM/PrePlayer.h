@@ -9,6 +9,9 @@
 
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
 
+extern uint16_t lpt;;
+extern bool opl322;
+
 extern uint8_t huge* pPreprocessed;
 extern uint8_t huge* pBuf;
 extern uint8_t huge* pEndBuf;

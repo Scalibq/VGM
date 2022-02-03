@@ -979,6 +979,12 @@ int main(int argc, char* argv[])
 				printf("OPL3 address set to: %Xh\n", opl3);
 			}
 		}
+		else if (stricmp(argv[i], "/opl322") == 0)
+		{
+			opl322 = true;
+
+			printf("OPL3 compatibility for dual OPL2 enabled\n");
+		}
 	}
 	
 	InitPCjrAudio();
@@ -1003,7 +1009,10 @@ int main(int argc, char* argv[])
 	//InitSamplePIT();
 	
 	ResetYM3812();
-	SetYMF262(0, 0);
+	if (opl322)
+		SetYMF262(1, 0);
+	else
+		SetYMF262(0, 0);
 	
 	InitKeyHandler();
 	
