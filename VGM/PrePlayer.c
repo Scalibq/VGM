@@ -38,6 +38,8 @@ extern uint16_t lpt;
 uint8_t huge* pPreprocessed;
 uint8_t huge* pBuf;
 uint8_t huge* pEndBuf;
+uint8_t huge* pLoopStart;
+uint8_t huge* pLoopEnd;
 
 void SetOPL3(uint16_t base)
 {
@@ -75,6 +77,8 @@ void LoadPreprocessed(const char* pFileName)
 	
 	// Set playing position to start of buffer
 	pBuf = pPreprocessed;
+	pLoopStart = pPreprocessed + preHeader.loop;
+	pLoopEnd = pEndBuf;
 }
 
 void PlayData(void)

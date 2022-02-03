@@ -676,6 +676,12 @@ void interrupt HandlerC(void)
 	uint16_t delay;
 
 	PlayData();
+	
+	// Handle looping
+	if (pBuf >= pLoopEnd)
+	{
+		pBuf = pLoopStart;
+	}
 
 	// Get delay value from stream
 	pW = (uint16_t huge*)pBuf;

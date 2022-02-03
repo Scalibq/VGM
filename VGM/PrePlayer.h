@@ -12,6 +12,8 @@
 extern uint8_t huge* pPreprocessed;
 extern uint8_t huge* pBuf;
 extern uint8_t huge* pEndBuf;
+extern uint8_t huge* pLoopStart;
+extern uint8_t huge* pLoopEnd;
 
 void LoadPreprocessed(const char* pFileName);
 void PlayData(void);
