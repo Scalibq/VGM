@@ -132,14 +132,22 @@ void PlayData(void)
 			// OPL3-compatible mode for dual OPL2
 			if (opl322)
 			{
-				uint8_t idx, data;
+				uint8_t idx, data, pan = 0x10;
 				idx = *pBuf++;
 				data = *pBuf++;
 				if (i == 1)
 				{
 					if ((idx == 4) || (idx == 5))
 						continue;
+					
+					pan = 0x20;
 				}
+				if ((idx >= 0xC0) && (idx <= 0xC8))
+				{
+					data &= 0x0F;
+					data |= pan;
+				}
+
 				outp(OPL3Reg[i], idx);
 				for (j = 0; j < 3; j++)
 					delay = inp(OPL3Reg[i]);
