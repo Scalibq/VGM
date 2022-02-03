@@ -27,11 +27,11 @@ void InitDelayTable()
 void PreProcessVGM(FILE* pFile, const char* pOutFile)
 {
 	FILE* pOut;
-	uint32_t delay = 0, minDelay, length;
+	uint32_t delay = 0, minDelay, length, lastDelay = 0, loopDelay = 0;
 	uint16_t srcDelay;
 	VGM_HEADER header;
-	uint32_t dataOffset, size;
-	uint16_t firstDelay, lastDelay, loopDelay;
+	uint32_t dataOffset;
+	uint16_t firstDelay;
 	uint16_t i;
 	uint8_t playing = 1;
 	uint16_t minutes, seconds, ms;

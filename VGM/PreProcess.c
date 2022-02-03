@@ -192,7 +192,7 @@ void AddDelay(uint32_t delay, FILE *pOut)
 		OutputCommands(pOut);
 		
 		// Reset command buffers
-		// (Next delays will get 0 notes exported
+		// (Next delays will get 0 notes exported)
 		ClearCommands();
 	}
 }
