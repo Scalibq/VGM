@@ -31,7 +31,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	uint16_t srcDelay;
 	VGM_HEADER header;
 	uint32_t dataOffset, size;
-	uint16_t firstDelay;
+	uint16_t firstDelay, lastDelay, loopDelay;
 	uint16_t i;
 	uint8_t playing = 1;
 	uint16_t minutes, seconds, ms;
@@ -134,7 +134,20 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	while (playing)
 	{
 		uint8_t data[2];
-		uint8_t value = fgetc(pFile);
+		uint32_t pos;
+		uint8_t value;
+
+		// Handle loop
+		pos = ftell(pFile);
+		if (pos == (header.lngLoopOffset + 0x1C))
+		{
+			preHeader.loop = ftell(pOut) - sizeof(preHeader);
+			loopDelay = lastDelay;
+			
+			printf("Loop point at %X\n", preHeader.loop);
+		}
+
+		value = fgetc(pFile);
 		
 		switch (value)
 		{
@@ -315,6 +328,8 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 		continue;
 		
 	endDelay:
+		lastDelay = delay;
+	
 		// Filter out delays that are too small between commands
 		// OPL2 needs 12 cycles for the data delay and 84 cycles for the address delay
 		// This is at the base clock of 14.31818 / 4 = 3.579545 MHz
@@ -375,18 +390,26 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 
 	}
 	
-	// Output last delay of 0
-	AddDelay(65536L, pOut);
+	if (preHeader.loop != 0)
+	{
+		// Output delay for loop
+		AddDelay(loopDelay, pOut);
+	}
+	else
+	{
+		// Output last delay of 0
+		AddDelay(65536L, pOut);
 	
-	// And a final delay of 0, which would get fetched by the last int handler
-	firstDelay = 0;
-	fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+		// And a final delay of 0, which would get fetched by the last int handler
+		firstDelay = 0;
+		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+	}
 	
-	// Update size field
-	size = ftell(pOut);
-	size -= sizeof(preHeader);
-	fseek(pOut, 8, SEEK_SET);
-	fwrite(&size, sizeof(size), 1, pOut);
+	// Update header for size and loop
+	preHeader.size = ftell(pOut);
+	preHeader.size -= sizeof(preHeader);
+	fseek(pOut, 0, SEEK_SET);
+	fwrite(&preHeader, sizeof(preHeader), 1, pOut);
 
 	fclose(pOut);
 	

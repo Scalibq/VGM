@@ -59,6 +59,7 @@ void LoadPreprocessed(const char* pFileName)
 	pPreprocessed = farmalloc(preHeader.size);
 	
 	printf("Preprocessed size: %lu\n", preHeader.size);
+	printf("Loop point: %X\n", preHeader.loop);
 	
 	printf("# SN76489: %u\n", preHeader.nrOfSN76489);
 	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
@@ -144,10 +145,10 @@ void PlayData(void)
 					continue;
 			}
 			outp(OPL3Reg[i], idx);
-			for (j = 0; j < 6; j++)
+			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i]);
 			outp(OPL3Reg[i]+1, data);
-			for (j = 0; j < 35; j++)
+			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i]);
 #endif
 		}
@@ -161,10 +162,10 @@ void PlayData(void)
 		while (count--)
 		{
 			outp(OPL3Reg[i*2 + 1], *pBuf++);
-			for (j = 0; j < 6; j++)
+			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i*2 + 1]);
 			outp(OPL3Reg[i*2 + 1]+1, *pBuf++);
-			for (j = 0; j < 35; j++)
+			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i*2 + 1]);
 		}
 
@@ -174,10 +175,10 @@ void PlayData(void)
 		while (count--)
 		{
 			outp(OPL3Reg[i*2], *pBuf++);
-			for (j = 0; j < 6; j++)
+			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i*2]);
 			outp(OPL3Reg[i*2]+1, *pBuf++);
-			for (j = 0; j < 35; j++)
+			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i*2]);
 		}
 	}
@@ -615,10 +616,10 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	// Enable OPL3-mode so both ports can be reset
 	// Enable OPL3 mode
 	outp(OPL3Reg[1], 5);
-	for (j = 0; j < 6; j++)
+	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
 	outp(OPL3Reg[1]+1, 1);
-	for (j = 0; j < 35; j++)
+	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
 	
 	// Write 0 to all YMF262 registers
@@ -626,10 +627,10 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	for (r = 0; r < 256; r++)
 	{
 		outp(OPL3Reg[0], r);
-		for (j = 0; j < 6; j++)
+		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[0]);
 		outp(OPL3Reg[0]+1, 0);
-		for (j = 0; j < 35; j++)
+		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[0]);
 	}
 
@@ -637,10 +638,10 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	for (r = 0; r < 4; r++)
 	{
 		outp(OPL3Reg[1], r);
-		for (j = 0; j < 6; j++)
+		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[1]);
 		outp(OPL3Reg[1]+1, 0);
-		for (j = 0; j < 35; j++)
+		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[1]);
 	}
 	
@@ -648,28 +649,28 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	for (r = 6; r < 255; r++)
 	{
 		outp(OPL3Reg[1], r);
-		for (j = 0; j < 6; j++)
+		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[1]);
 		outp(OPL3Reg[1]+1, 0);
-		for (j = 0; j < 35; j++)
+		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[1]);
 	}
 	
 	// Enable 4-OP mode
 	// Second port
 	outp(OPL3Reg[1], 4);
-	for (j = 0; j < 6; j++)
+	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
 	outp(OPL3Reg[1]+1, fourOp);
-	for (j = 0; j < 35; j++)
+	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
 
 	// Enable OPL3 mode
 	outp(OPL3Reg[1], 5);
-	for (j = 0; j < 6; j++)
+	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
 	outp(OPL3Reg[1]+1, opl3);
-	for (j = 0; j < 35; j++)
+	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[1]);
 }
 
@@ -677,4 +678,3 @@ void ResetYMF262(void)
 {
 	SetYMF262(0, 0);
 }
-
