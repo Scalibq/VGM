@@ -135,7 +135,7 @@ void PlayData(void)
 				uint8_t idx, data, pan = 0x10;
 				idx = *pBuf++;
 				data = *pBuf++;
-				if (i == 1)
+				if (i &= 1)
 				{
 					if ((idx == 4) || (idx == 5))
 						continue;
