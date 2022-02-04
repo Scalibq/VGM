@@ -20,14 +20,54 @@
 
 #define SNFreq 3579540
 
-uint16_t SNReg[MAX_MULTICHIP] = { 0xC0, 0xC0 };
-uint16_t SAAReg[MAX_MULTICHIP] = { 0x240, 0x242 };
-uint16_t AYReg[MAX_MULTICHIP] = { 0x220, 0x220 };
-uint16_t OPL2Reg[MAX_MULTICHIP] = { 0x220, 0x222 };
-uint16_t OPL3Reg[MAX_MULTICHIP*2] = { 0x220, 0x222, 0x220, 0x222 };	// Special case: there are two separate ports for the chip
-uint16_t MPUReg[MAX_MULTICHIP] = { 0x330, 0x330 };
-uint16_t IMFCReg[MAX_MULTICHIP] = { 0x2A20, 0x2A20 };
-uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x220 };
+typedef struct
+{
+	uint16_t command;
+} SN76489Reg;
+
+typedef struct
+{
+	uint16_t data;
+	uint16_t command;
+} SAA1099Reg;
+
+typedef struct
+{
+	uint16_t command;
+	uint16_t data;
+} AY8930Reg;
+
+typedef struct
+{
+	uint16_t command;
+	uint16_t data;
+} OPL2;
+
+typedef struct
+{
+	OPL2 port0;
+	OPL2 port1;
+} OPL3;
+
+typedef struct
+{
+	uint16_t command;
+	uint16_t data;
+} MPU;
+
+typedef struct
+{
+	uint16_t command;
+} IMFC;
+
+SN76489Reg SNReg[MAX_MULTICHIP] = { { 0xC0 }, { 0xC0 } };
+SAA1099Reg SAAReg[MAX_MULTICHIP] = { { 0x240, 0x241 }, { 0x242, 0x243 } };
+AY8930Reg AYReg[MAX_MULTICHIP] = { { 0x220, 0x224 }, { 0x220, 0x224 } };
+OPL2 OPL2Reg[MAX_MULTICHIP] = { { 0x220, 0x221 }, { 0x222, 0x223 } };
+OPL3 OPL3Reg[MAX_MULTICHIP] = { { { 0x220, 0x221 }, { 0x222, 0x223 } }, { { 0x220, 0x221 }, { 0x222, 0x223 } } };
+MPU MPUReg[MAX_MULTICHIP] = { { 0x330, 0x331 }, { 0x330, 0x331 } };
+IMFC IMFCReg[MAX_MULTICHIP] = { { 0x2A20 }, { 0x2A20 } };
+uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x240 };
 
 uint16_t lpt;
 bool opl322 = false;
@@ -44,10 +84,15 @@ uint8_t huge* pLoopEnd;
 
 void SetOPL3(uint16_t base)
 {
-	OPL3Reg[0] = base;
-	OPL3Reg[1] = base + 2;
-	OPL3Reg[2] = base;
-	OPL3Reg[3] = base + 2;
+	OPL3Reg[0].port0.command = base;
+	OPL3Reg[0].port0.data = base + 1;
+	OPL3Reg[0].port1.command = base + 2;
+	OPL3Reg[0].port1.data = base + 3;
+	
+	OPL3Reg[1].port0.command = base;
+	OPL3Reg[1].port0.data = base + 1;
+	OPL3Reg[1].port1.command = base + 2;
+	OPL3Reg[1].port1.data = base + 3;
 }
 
 void LoadPreprocessed(const char* pFileName)
@@ -94,7 +139,7 @@ void PlayData(void)
 	{
 		count = *pBuf++;
 		while (count--)
-			outp(SNReg[i], *pBuf++);
+			outp(SNReg[i].command, *pBuf++);
 	}
 		
 	for (i = 0; i < preHeader.nrOfSAA1099; i++)
@@ -103,8 +148,8 @@ void PlayData(void)
 	
 		while (count--)
 		{
-			outp(SAAReg[i]+1, *pBuf++);
-			outp(SAAReg[i], *pBuf++);
+			outp(SAAReg[i].command, *pBuf++);
+			outp(SAAReg[i].data, *pBuf++);
 		}
 	}
 				
@@ -114,8 +159,8 @@ void PlayData(void)
 	
 		while (count--)
 		{
-			outp(AYReg[i], *pBuf++);
-			outp(AYReg[i]+4, *pBuf++);
+			outp(AYReg[i].command, *pBuf++);
+			outp(AYReg[i].data, *pBuf++);
 		}
 	}
 		
@@ -132,37 +177,59 @@ void PlayData(void)
 			// OPL3-compatible mode for dual OPL2
 			if (opl322)
 			{
-				uint8_t idx, data, pan = 0x10;
+				uint8_t idx, data;
+				uint16_t o;
 				idx = *pBuf++;
 				data = *pBuf++;
+				
+				o = i >> 1;
+		
 				if (i &= 1)
 				{
+					// Send to port 1 of OPL3
 					if ((idx == 4) || (idx == 5))
 						continue;
 					
-					pan = 0x20;
+					// Adjust panning
+					if ((idx >= 0xC0) && (idx <= 0xC8))
+					{
+						data &= 0x0F;
+						data |= 0x20;
+					}
+					
+					outp(OPL3Reg[o].port1.command, idx);
+					for (j = 0; j < 3; j++)
+						delay = inp(OPL3Reg[o].port1.command);
+					outp(OPL3Reg[o].port1.data, data);
+					for (j = 0; j < 3; j++)
+						delay = inp(OPL3Reg[o].port1.command);
 				}
-				if ((idx >= 0xC0) && (idx <= 0xC8))
+				else
 				{
-					data &= 0x0F;
-					data |= pan;
-				}
+					// Adjust panning
+					if ((idx >= 0xC0) && (idx <= 0xC8))
+					{
+						data &= 0x0F;
+						data |= 0x10;
+					}
 
-				outp(OPL3Reg[i], idx);
-				for (j = 0; j < 3; j++)
-					delay = inp(OPL3Reg[i]);
-				outp(OPL3Reg[i]+1, data);
-				for (j = 0; j < 3; j++)
-					delay = inp(OPL3Reg[i]);
+					// Send to port 0 of OPL3
+					outp(OPL3Reg[o].port0.command, idx);
+					for (j = 0; j < 3; j++)
+						delay = inp(OPL3Reg[o].port0.command);
+					outp(OPL3Reg[o].port0.data, data);
+					for (j = 0; j < 3; j++)
+						delay = inp(OPL3Reg[o].port0.command);
+				}
 			}
 			else
 			{
-				outp(OPL2Reg[i], *pBuf++);
+				outp(OPL2Reg[i].command, *pBuf++);
 				for (j = 0; j < 6; j++)
-					delay = inp(OPL2Reg[i]);
-				outp(OPL2Reg[i]+1, *pBuf++);
+					delay = inp(OPL2Reg[i].command);
+				outp(OPL2Reg[i].data, *pBuf++);
 				for (j = 0; j < 35; j++)
-					delay = inp(OPL2Reg[i]);
+					delay = inp(OPL2Reg[i].command);
 			}
 #endif
 		}
@@ -175,12 +242,12 @@ void PlayData(void)
 			
 		while (count--)
 		{
-			outp(OPL3Reg[i*2 + 1], *pBuf++);
+			outp(OPL3Reg[i].port1.command, *pBuf++);
 			for (j = 0; j < 3; j++)
-				delay = inp(OPL3Reg[i*2 + 1]);
-			outp(OPL3Reg[i*2 + 1]+1, *pBuf++);
+				delay = inp(OPL3Reg[i].port1.command);
+			outp(OPL3Reg[i].port1.data, *pBuf++);
 			for (j = 0; j < 3; j++)
-				delay = inp(OPL3Reg[i*2 + 1]);
+				delay = inp(OPL3Reg[i].port1.command);
 		}
 
 		// Then port 0 commands
@@ -188,12 +255,12 @@ void PlayData(void)
 			
 		while (count--)
 		{
-			outp(OPL3Reg[i*2], *pBuf++);
+			outp(OPL3Reg[i].port0.command, *pBuf++);
 			for (j = 0; j < 3; j++)
-				delay = inp(OPL3Reg[i*2]);
-			outp(OPL3Reg[i*2]+1, *pBuf++);
+				delay = inp(OPL3Reg[i].port0.command);
+			outp(OPL3Reg[i].port0.data, *pBuf++);
 			for (j = 0; j < 3; j++)
-				delay = inp(OPL3Reg[i*2]);
+				delay = inp(OPL3Reg[i].port0.command);
 		}
 	}
 	
@@ -241,21 +308,21 @@ void InitMPU401(void)
 {
 	uint8_t c;
 	
-	set_uart(MPUReg[0]);
+	set_uart(MPUReg[0].command);
 	
 	// For all channels
 	for (c = 0; c < 16; c++)
 	{
 		// Send All Notes Off
-		put_mpu_out(MPUReg[0], 0xB0 + c);
-		put_mpu_out(MPUReg[0], 123);
+		put_mpu_out(MPUReg[0].command, 0xB0 + c);
+		put_mpu_out(MPUReg[0].command, 123);
 		
 		// Send All Sound Off
-		put_mpu_out(MPUReg[0], 0xB0 + c);
-		put_mpu_out(MPUReg[0], 120);
+		put_mpu_out(MPUReg[0].command, 0xB0 + c);
+		put_mpu_out(MPUReg[0].command, 120);
 	}
 	
-	OutputMIDI(MPUReg[0], GMReset, _countof(GMReset));
+	OutputMIDI(MPUReg[0].command, GMReset, _countof(GMReset));
 }
 
 void CloseMPU401(void)
@@ -266,17 +333,17 @@ void CloseMPU401(void)
 	for (c = 0; c < 16; c++)
 	{
 		// Send All Notes Off
-		put_mpu_out(MPUReg[0], 0xB0 + c);
-		put_mpu_out(MPUReg[0], 123);
+		put_mpu_out(MPUReg[0].command, 0xB0 + c);
+		put_mpu_out(MPUReg[0].command, 123);
 		
 		// Send All Sound Off
-		put_mpu_out(MPUReg[0], 0xB0 + c);
-		put_mpu_out(MPUReg[0], 120);
+		put_mpu_out(MPUReg[0].command, 0xB0 + c);
+		put_mpu_out(MPUReg[0].command, 120);
 	}
 	
-	OutputMIDI(MPUReg[0], GMReset, _countof(GMReset));
+	OutputMIDI(MPUReg[0].command, GMReset, _countof(GMReset));
 	
-	reset_mpu(MPUReg[0]);
+	reset_mpu(MPUReg[0].command);
 }
 
 void InitIMFCAll(void)
@@ -285,27 +352,27 @@ void InitIMFCAll(void)
 	
 	uint8_t c;
 	
-	InitIMFC(IMFCReg[0], IMFC_MUSIC_MODE);
+	InitIMFC(IMFCReg[0].command, IMFC_MUSIC_MODE);
 	
 	// Turn all notes off
 	// For all channels
 	for (c = 0; c < 16; c++)
 	{
 		// Send All Notes Off
-		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
-		WriteDataToIMFC(IMFCReg[0], 123);
+		WriteDataToIMFC(IMFCReg[0].command, 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0].command, 123);
 		
 		// Reset all controllers
-		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
-		WriteDataToIMFC(IMFCReg[0], 121);
+		WriteDataToIMFC(IMFCReg[0].command, 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0].command, 121);
 		
 		// Send All Sound Off
-		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
-		WriteDataToIMFC(IMFCReg[0], 120);
+		WriteDataToIMFC(IMFCReg[0].command, 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0].command, 120);
 	}
 	
 	// Set MONO 8 configuration (config 17)
-	OutputMIDI(IMFCReg[0], SetConfig, _countof(SetConfig));
+	OutputMIDI(IMFCReg[0].command, SetConfig, _countof(SetConfig));
 }
 
 void CloseIMFC(void)
@@ -316,16 +383,16 @@ void CloseIMFC(void)
 	for (c = 0; c < 16; c++)
 	{
 		// Send All Notes Off
-		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
-		WriteDataToIMFC(IMFCReg[0], 123);
+		WriteDataToIMFC(IMFCReg[0].command, 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0].command, 123);
 		
 		// Reset all controllers
-		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
-		WriteDataToIMFC(IMFCReg[0], 121);
+		WriteDataToIMFC(IMFCReg[0].command, 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0].command, 121);
 
 		// Send All Sound Off
-		WriteDataToIMFC(IMFCReg[0], 0xB0 + c);
-		WriteDataToIMFC(IMFCReg[0], 120);
+		WriteDataToIMFC(IMFCReg[0].command, 0xB0 + c);
+		WriteDataToIMFC(IMFCReg[0].command, 120);
 	}
 	
 	// Music Card Message (1e5 - Reboot)
@@ -533,12 +600,12 @@ void SetPCjrAudioPeriod(uint8_t chan, uint16_t period)
 	command = chan << 5;	// get voice reg in place
 	command |= 0x80;		// tell chip we are selecting a reg
 	command |= (period & 0xF);	// grab least sig 4 bits of period...
-	outp(SNReg[0],command);
+	outp(SNReg[0].command,command);
 	
     // build LSB
 	command = period >> 4;	// isolate upper 6 bits
 	//command &= 0x7F;		// clear bit 7 to indicate rest of freq
-    outp(SNReg[0],command);
+    outp(SNReg[0].command,command);
 }
 
 // Sets an SN voice with volume
@@ -559,7 +626,7 @@ void SetPCjrAudioVolume(uint8_t chan, uint8_t volume)
 	command = chan << 5;	// get voice reg in place
 	command |= 0x90;	// tell chip we're selecting a reg for volume
 	command |= volume;	// adjust to attenuation; register expects 0 = full, 15 = quiet
-	outp(SNReg[0], command);
+	outp(SNReg[0].command, command);
 }
 
 // Sets an SN voice with volume and a desired frequency
@@ -612,12 +679,12 @@ void ResetYM3812(void)
 		WriteOPL2LPTAddr(lpt, r);
 		WriteOPL2LPTData(lpt, 0);
 #else
-		outp(OPL2Reg[0], r);
+		outp(OPL2Reg[0].command, r);
 		for (j = 0; j < 6; j++)
-			delay = inp(OPL2Reg[0]);
-		outp(OPL2Reg[0]+1, 0);
+			delay = inp(OPL2Reg[0].command);
+		outp(OPL2Reg[0].data+1, 0);
 		for (j = 0; j < 35; j++)
-			delay = inp(OPL2Reg[0]);
+			delay = inp(OPL2Reg[0].command);
 #endif
 	}
 }
@@ -629,63 +696,63 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	
 	// Enable OPL3-mode so both ports can be reset
 	// Enable OPL3 mode
-	outp(OPL3Reg[1], 5);
+	outp(OPL3Reg[0].port1.command, 5);
 	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
-	outp(OPL3Reg[1]+1, 1);
+		delay = inp(OPL3Reg[0].port1.command);
+	outp(OPL3Reg[0].port1.data, 1);
 	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
+		delay = inp(OPL3Reg[0].port1.command);
 	
 	// Write 0 to all YMF262 registers
 	// First port
 	for (r = 0; r < 256; r++)
 	{
-		outp(OPL3Reg[0], r);
+		outp(OPL3Reg[0].port0.command, r);
 		for (j = 0; j < 3; j++)
-			delay = inp(OPL3Reg[0]);
-		outp(OPL3Reg[0]+1, 0);
+			delay = inp(OPL3Reg[0].port0.command);
+		outp(OPL3Reg[0].port0.data, 0);
 		for (j = 0; j < 3; j++)
-			delay = inp(OPL3Reg[0]);
+			delay = inp(OPL3Reg[0].port0.command);
 	}
 
 	// Second port
 	for (r = 0; r < 4; r++)
 	{
-		outp(OPL3Reg[1], r);
+		outp(OPL3Reg[0].port1.command, r);
 		for (j = 0; j < 3; j++)
-			delay = inp(OPL3Reg[1]);
-		outp(OPL3Reg[1]+1, 0);
+			delay = inp(OPL3Reg[0].port1.command);
+		outp(OPL3Reg[0].port1.data, 0);
 		for (j = 0; j < 3; j++)
-			delay = inp(OPL3Reg[1]);
+			delay = inp(OPL3Reg[0].port1.command);
 	}
 	
 	// Skip registers 4 and 5, they enable/disable OPL3 functionalities	
 	for (r = 6; r < 255; r++)
 	{
-		outp(OPL3Reg[1], r);
+		outp(OPL3Reg[0].port1.command, r);
 		for (j = 0; j < 3; j++)
-			delay = inp(OPL3Reg[1]);
-		outp(OPL3Reg[1]+1, 0);
+			delay = inp(OPL3Reg[0].port1.command);
+		outp(OPL3Reg[0].port1.data, 0);
 		for (j = 0; j < 3; j++)
-			delay = inp(OPL3Reg[1]);
+			delay = inp(OPL3Reg[0].port1.command);
 	}
 	
 	// Enable 4-OP mode
 	// Second port
-	outp(OPL3Reg[1], 4);
+	outp(OPL3Reg[0].port1.command, 4);
 	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
-	outp(OPL3Reg[1]+1, fourOp);
+		delay = inp(OPL3Reg[0].port1.command);
+	outp(OPL3Reg[0].port1.data, fourOp);
 	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
+		delay = inp(OPL3Reg[0].port1.command);
 
 	// Enable OPL3 mode
-	outp(OPL3Reg[1], 5);
+	outp(OPL3Reg[0].port1.command, 5);
 	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
-	outp(OPL3Reg[1]+1, opl3);
+		delay = inp(OPL3Reg[0].port1.command);
+	outp(OPL3Reg[0].port1.data, opl3);
 	for (j = 0; j < 3; j++)
-		delay = inp(OPL3Reg[1]);
+		delay = inp(OPL3Reg[0].port1.command);
 }
 
 void ResetYMF262(void)
