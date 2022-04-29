@@ -870,7 +870,6 @@ void PlayInt(const char* pVGMFile)
 	uint16_t far* pW;
 	
 	PrepareFile(pVGMFile);
-
 	
 	// Int-based replay
 	// Setup auto-EOI

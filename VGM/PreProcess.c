@@ -39,6 +39,7 @@ uint16_t GetCommandLengthCount(uint16_t chip, uint16_t type, uint16_t *pLength)
 		case YM3812:
 		case YMF262PORT0:
 		case YMF262PORT1:
+		case YM2151:
 			count >>= 1;
 			break;
 	}
@@ -104,6 +105,14 @@ void OutputCommands(FILE* pOut)
 	
 		commands[i][MIDI][0] = count;
 		fwrite(commands[i][MIDI], length, 1, pOut);
+	}
+	
+	for (i = 0; i < preHeader.nrOfYM2151; i++)
+	{
+		count = GetCommandLengthCount(i, YM2151, &length);
+
+		commands[i][YM2151][0] = count;
+		fwrite(commands[i][YM2151], length, 1, pOut);
 	}
 }
 

@@ -19,8 +19,9 @@
 #define YMF262PORT0 4
 #define YMF262PORT1 5
 #define MIDI 6
+#define YM2151 7
 
-#define NUM_CHIPS 7
+#define NUM_CHIPS 8
 #define MAX_MULTICHIP 2
 #define MAX_COMMANDS 255
 #define MAX_COMMAND_SIZE 2
@@ -37,6 +38,7 @@
 #define	AY8930_COMMAND_DURATION		(12)
 #define	ADLIB_COMMAND_DURATION		(250)
 #define	OPL3_COMMAND_DURATION		(250)
+#define	YM2151_COMMAND_DURATION		(250)
 
 typedef struct _PreHeader
 {
@@ -51,6 +53,7 @@ typedef struct _PreHeader
 	uint8_t nrOfYM3812;
 	uint8_t nrOfYMF262;
 	uint8_t nrOfMIDI;
+	uint8_t nrOfYM2151;
 } PreHeader;
 
 extern PreHeader preHeader;

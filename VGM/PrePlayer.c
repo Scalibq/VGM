@@ -60,6 +60,12 @@ typedef struct
 	uint16_t command;
 } IMFC;
 
+typedef struct
+{
+	uint16_t command;
+	uint16_t data;
+} YM2151Reg;
+
 SN76489Reg SNReg[MAX_MULTICHIP] = { { 0xC0 }, { 0xC0 } };
 SAA1099Reg SAAReg[MAX_MULTICHIP] = { { 0x240, 0x241 }, { 0x242, 0x243 } };
 AY8930Reg AYReg[MAX_MULTICHIP] = { { 0x220, 0x224 }, { 0x220, 0x224 } };
@@ -68,6 +74,7 @@ OPL3 OPL3Reg[MAX_MULTICHIP] = { { { 0x220, 0x221 }, { 0x222, 0x223 } }, { { 0x22
 MPU MPUReg[MAX_MULTICHIP] = { { 0x330, 0x331 }, { 0x330, 0x331 } };
 IMFC IMFCReg[MAX_MULTICHIP] = { { 0x2A20 }, { 0x2A20 } };
 uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x240 };
+YM2151Reg YMReg[MAX_MULTICHIP] = { { 0x22E, 0x22F }, { 0x24E, 0x24F } };
 
 uint16_t lpt;
 bool opl322 = false;
@@ -113,6 +120,7 @@ void LoadPreprocessed(const char* pFileName)
 	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
 	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
 	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
+	printf("# YM2151: %u\n", preHeader.nrOfYM2151);
 	
 	// Search to start of data
 	fseek(pFile, preHeader.headerLen, SEEK_SET);
@@ -279,6 +287,21 @@ void PlayData(void)
 #endif
 
 		pBuf += count;
+	}
+	
+	for (i = 0; i < preHeader.nrOfYM2151; i++)
+	{
+		count = *pBuf++;
+	
+		while (count--)
+		{
+			outp(YMReg[i].command, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(YMReg[i].command);
+			outp(YMReg[i].data, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(YMReg[i].command);
+		}
 	}
 }
 

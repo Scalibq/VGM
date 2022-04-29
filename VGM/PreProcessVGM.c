@@ -94,11 +94,13 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	// Detect used chips
 	preHeader.nrOfMIDI = 0;	// Not (yet?) supported in VGM
 	preHeader.nrOfSN76489 = (header.lngHzPSG != 0) + ((header.lngHzPSG & 0x40000000L) != 0);
+	preHeader.nrOfYM2151 = (header.lngHzYM2151 != 0) + ((header.lngHzYM2151 & 0x40000000L) != 0);
 	
 	preHeader.nrOfAY8930 = 0;
 	preHeader.nrOfYM3812 = 0;
 	preHeader.nrOfYMF262 = 0;
 	preHeader.nrOfSAA1099 = 0;
+	
 
 	if (header.lngVersion >= 0x151)
 	{
@@ -124,6 +126,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
 	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
 	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
+	printf("# YM2151: %u\n", preHeader.nrOfYM2151);
 	
 	// Save header
 	_farfwrite(&preHeader, sizeof(preHeader), 1, pOut);
@@ -291,6 +294,15 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 				fread(data, sizeof(data), 1, pFile);
 				AddCommandMulti(1, YMF262PORT1, data[0], data[1], pOut);
 				break;
+
+			case 0x54:	// aa dd : YM2151, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(0, YM2151, data[0], data[1], pOut);
+				break;
+			case 0xA4:	// aa dd : Second YM2151, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(1, YM2151, data[0], data[1], pOut);
+				break;
 		
 			case 0x51:	// aa dd : YM2413, write value dd to register aa
 			case 0xA1:	// aa dd : Second YM2413, write value dd to register aa
@@ -298,8 +310,6 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
 			case 0xA2:	// aa dd : Second Second YM2612 port 0, write value dd to register aa
 			case 0xA3:	// aa dd : Second YM2612 port 1, write value dd to register aa
-			case 0x54:	// aa dd : YM2151, write value dd to register aa
-			case 0xA4:	// aa dd : Second YM2151, write value dd to register aa
 			case 0x55:	// aa dd : YM2203, write value dd to register aa
 			case 0xA5:	// aa dd : Second YM2203, write value dd to register aa
 			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
@@ -375,6 +385,12 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 		{
 			length = GetCommandLengthCount(i, MIDI, NULL);
 			minDelay += (MIDI_BYTE_DURATION*length);
+		}
+
+		for (i = 0; i < preHeader.nrOfYM2151; i++)
+		{
+			length = GetCommandLengthCount(i, YM2151, NULL);
+			minDelay += (YM2151_COMMAND_DURATION*length);
 		}
 
 		if (delay > minDelay)
