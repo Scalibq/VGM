@@ -12,6 +12,7 @@ PreHeader preHeader = {
 	0,					// nrOfYM3812;
 	0,					// nrOfYMF262;
 	0,					// nrOfMIDI;
+	0,					// nrOfYM2151;
 };
 
 // Buffer format:

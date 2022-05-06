@@ -67,7 +67,7 @@ typedef struct
 } YM2151Reg;
 
 SN76489Reg SNReg[MAX_MULTICHIP] = { { 0xC0 }, { 0xC0 } };
-SAA1099Reg SAAReg[MAX_MULTICHIP] = { { 0x240, 0x241 }, { 0x242, 0x243 } };
+SAA1099Reg SAAReg[MAX_MULTICHIP] = { { 0x220, 0x221 }, { 0x222, 0x223 } };
 AY8930Reg AYReg[MAX_MULTICHIP] = { { 0x220, 0x224 }, { 0x220, 0x224 } };
 OPL2 OPL2Reg[MAX_MULTICHIP] = { { 0x220, 0x221 }, { 0x222, 0x223 } };
 OPL3 OPL3Reg[MAX_MULTICHIP] = { { { 0x220, 0x221 }, { 0x222, 0x223 } }, { { 0x220, 0x221 }, { 0x222, 0x223 } } };
