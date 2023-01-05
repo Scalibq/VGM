@@ -40,12 +40,12 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 	pollLoop:
 		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
 		mov al, (CHAN0 or AMREAD)
-		out CTCMODECMDREG, al
+		out PC_CTCMODECMDREG, al
 		// Get LSB of timer counter
-		in al, CHAN0PORT
+		in al, PC_CHAN0PORT
 		mov cl, al
 		// Get MSB of timer counter
-		in al, CHAN0PORT
+		in al, PC_CHAN0PORT
 		mov ch, al
 			
 		// Handle wraparound to 32-bit counter
@@ -83,13 +83,13 @@ void tickWaitC(uint32_t numTicks, uint32_t* pCurrentTime)
 		uint8_t* pTime = (uint8_t*)&time;
 		
 		// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
-		outp(CTCMODECMDREG, CHAN0 | AMREAD);
+		outp(PC_CTCMODECMDREG, CHAN0 | AMREAD);
 		
 		// Get LSB of timer counter
-		*pTime = inp(CHAN0PORT);
+		*pTime = inp(PC_CHAN0PORT);
 		
 		// Get MSB of timer counter
-		*(pTime+1) = inp(CHAN0PORT);
+		*(pTime+1) = inp(PC_CHAN0PORT);
 		
 		// Handle wraparound
 		if (time > lastTime)
@@ -134,10 +134,10 @@ void PlayBuffer2()
 	//_disable();
 	
 	// Get LSB of timer counter
-	currentTime = inp(CHAN0PORT);
+	currentTime = inp(PC_CHAN0PORT);
 	
 	// Get MSB of timer counter
-	currentTime |= ((uint16_t)inp(CHAN0PORT)) << 8;
+	currentTime |= ((uint16_t)inp(PC_CHAN0PORT)) << 8;
 	
 	// Count down from maximum
 	currentTime |= 0xFFFF0000l;
@@ -170,12 +170,12 @@ void PlayBuffer2()
 		pollLoop:
 			// PIT command: Channel 0, Latch Counter, Rate Generator, Binary
 			mov al, (CHAN0 or AMREAD)
-			out CTCMODECMDREG, al
+			out PC_CTCMODECMDREG, al
 			// Get LSB of timer counter
-			in al, CHAN0PORT
+			in al, PC_CHAN0PORT
 			mov cl, al
 			// Get MSB of timer counter
-			in al, CHAN0PORT
+			in al, PC_CHAN0PORT
 			mov ch, al
 				
 			// Handle wraparound to 32-bit counter
@@ -251,10 +251,10 @@ void PlayBuffer2C()
 	//_disable();
 	
 	// Get LSB of timer counter
-	currentTime = inp(CHAN0PORT);
+	currentTime = inp(PC_CHAN0PORT);
 	
 	// Get MSB of timer counter
-	currentTime |= ((uint16_t)inp(CHAN0PORT)) << 8;
+	currentTime |= ((uint16_t)inp(PC_CHAN0PORT)) << 8;
 	
 	// Count down from maximum
 	currentTime |= 0xFFFF0000l;
@@ -495,14 +495,14 @@ void PlayPolled1(void)
 		
 		// Get delay value from stream
 		lodsb
-		out CHAN0PORT, al
+		out PC_CHAN0PORT, al
 		lodsb
-		out CHAN0PORT, al
+		out PC_CHAN0PORT, al
 
 	mainLoop:
 		
 		// Poll for interrupt
-		mov dx, PIC1
+		mov dx, PC_PIC1
 		mov ah, 0x01
 
 	pollLoop:
@@ -565,9 +565,9 @@ void PlayPolled1(void)
 		// Get delay value from stream
 		//lds si, [pBuf]
 		lodsb
-		out CHAN0PORT, al
+		out PC_CHAN0PORT, al
 		lodsb
-		out CHAN0PORT, al
+		out PC_CHAN0PORT, al
 
 
 		cmp si, di
@@ -607,14 +607,14 @@ void PlayPolled2(void)
 		
 		// Get delay value from stream
 		lodsb
-		out CHAN0PORT, al
+		out PC_CHAN0PORT, al
 		lodsb
-		out CHAN0PORT, al
+		out PC_CHAN0PORT, al
 
 	mainLoop:
 		
 		// Poll for interrupt
-		mov dx, PIC1_COMMAND
+		mov dx, PC_PIC1_COMMAND
 		mov ah, 0x80
 		
 	pollLoop:
@@ -643,9 +643,9 @@ void PlayPolled2(void)
 	endHandler:
 		// Get delay value from stream
 		lodsb
-		out CHAN0PORT, al
+		out PC_CHAN0PORT, al
 		lodsb
-		out CHAN0PORT, al
+		out PC_CHAN0PORT, al
 
 		cmp si, di
 		jb mainLoop
@@ -712,22 +712,22 @@ void interrupt KeyHandler()
 	if (key == 1)
 		playing = 0;
 	
-	outp(PIC1_COMMAND, OCW2_EOI);
+	outp(PC_PIC1_COMMAND, OCW2_EOI);
 }
 
 void SetTimerRate(uint16_t rate)
 {
 	// Reset mode to trigger timer immediately
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	
-	outp(CHAN0PORT, rate);
-	outp(CHAN0PORT, rate >> 8);
+	outp(PC_CHAN0PORT, rate);
+	outp(PC_CHAN0PORT, rate >> 8);
 }
 
 void SetTimerCount(uint16_t rate)
 {
-	outp(CHAN0PORT, rate);
-	outp(CHAN0PORT, rate >> 8);
+	outp(PC_CHAN0PORT, rate);
+	outp(PC_CHAN0PORT, rate >> 8);
 }
 
 void InitHandler(void)
@@ -809,14 +809,14 @@ void PlayPoll1(const char* pVGMFile)
 	PrepareFile(pVGMFile);
 		
 	// Set to rate generator
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	SetTimerCount(0);
 	
 	// Polling timer-based replay
 	PlayBuffer2C();
 	
 	// Reset to square wave
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
 	SetTimerCount(0);
 }
 
@@ -830,13 +830,13 @@ void PlayPoll2(const char* pVGMFile)
 	SetAutoEOI(machineType);
 	
 	// Set to sqarewave generator
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
 	SetTimerCount(0);
 
 	PlayPolled1();
 	
 	// Reset to square wave
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
 	SetTimerCount(0);
 	
 	RestorePICState(machineType);
@@ -852,13 +852,13 @@ void PlayPoll3(const char* pVGMFile)
 	SetAutoEOI(machineType);
 	
 	// Set to rate generator
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	SetTimerCount(0);
 
 	PlayPolled2();
 	
 	// Reset to square wave
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
 	SetTimerCount(0);
 	
 	RestorePICState(machineType);
@@ -880,11 +880,11 @@ void PlayInt(const char* pVGMFile)
 	_disable();
 	
 	// Set to rate generator
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	
 	// Mask timer interrupts
-	mask = inp(PIC1_DATA);
-	outp(PIC1_DATA, mask | 1);
+	mask = inp(PC_PIC1_DATA);
+	outp(PC_PIC1_DATA, mask | 1);
 
 	// Have timer restart instantly
 	SetTimerCount(1);
@@ -899,7 +899,7 @@ void PlayInt(const char* pVGMFile)
 	_enable();
 	
 	// Unmask timer interrupts
-	outp(PIC1_DATA, mask);
+	outp(PC_PIC1_DATA, mask);
 	
 	while (playing)
 	{
@@ -907,7 +907,7 @@ void PlayInt(const char* pVGMFile)
 
 		//__asm hlt
 		
-		SplitTime(playTime / (PITFREQ/1000L), &minutes, &seconds, &ms);
+		SplitTime(playTime / (PC_PITFREQ/1000L), &minutes, &seconds, &ms);
 
 		printf("\rTime: %u:%02u.%03u", minutes, seconds, ms);
 
@@ -918,16 +918,36 @@ void PlayInt(const char* pVGMFile)
 	DeinitHandler();
 	
 	// Reset to square wave
-	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
 	SetTimerCount(0);
 	
 	RestorePICState(machineType);
+}
+
+int IsPC98()
+{
+	// PC-98 has a very different implementation of INT 10h
+	// On a DOS machine, this call will return the current video mode
+	// On a PC-98, AH will not be overwritten
+	union REGPACK regs;
+	regs.h.ah = 0x0F;
+
+	intr(0x10, &regs);
+	
+	return (regs.h.ah == 0x0F);
 }
 
 int main(int argc, char* argv[])
 {
 	FILE* pFile;
 	uint16_t i;
+	
+	int pc98 = IsPC98();
+	
+	if (pc98)
+		printf("PC-98 machine detected!\n");
+	else
+		printf("IBM PC machine detected!\n");
 	
 	if (argc < 2)
 	{

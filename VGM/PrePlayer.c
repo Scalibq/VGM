@@ -8,6 +8,8 @@
 #include <string.h>
 #include "8253.h"
 #include "8259A.h"
+#include "IBMPC.h"
+#include "PC98.h"
 #include "MPU401.h"
 #include "IMFC.h"
 #include "SB.h"
@@ -673,8 +675,8 @@ void InitPCSpeaker(void)
 	ppi |= 0x3;
 	outp(PPIPORTB, ppi);
 	
-	outp(CTCMODECMDREG, CHAN2 | AMLOBYTE | MODE0 | BINARY);
-	outp(CHAN2PORT, 0x01);	// Counter 2 count = 1 - terminate count quickly
+	outp(PC_CTCMODECMDREG, CHAN2 | AMLOBYTE | MODE0 | BINARY);
+	outp(PC_CHAN2PORT, 0x01);	// Counter 2 count = 1 - terminate count quickly
 }
 
 void ClosePCSpeaker(void)
@@ -685,9 +687,9 @@ void ClosePCSpeaker(void)
 	outp(PPIPORTB, ppi);
 	
 	// Reset timer
-	outp(CTCMODECMDREG, CHAN2 | AMBOTH | MODE3 | BINARY);
-	outp(CHAN2PORT, 0);
-	outp(CHAN2PORT, 0);
+	outp(PC_CTCMODECMDREG, CHAN2 | AMBOTH | MODE3 | BINARY);
+	outp(PC_CHAN2PORT, 0);
+	outp(PC_CHAN2PORT, 0);
 }
 
 void ResetYM3812(void)

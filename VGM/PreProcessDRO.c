@@ -1,4 +1,5 @@
 #include "Common.h"
+#include "IBMPC.h"
 #include "PreProcessDRO.h"
 
 void PreProcessDRO(FILE* pFile, const char* pOutFile)
@@ -87,7 +88,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 			if (totalDelay > 0)
 			{
 				// Convert to PIT ticks
-				delay = totalDelay*(PITFREQ/1000.0);
+				delay = totalDelay*(PC_PITFREQ/1000.0);
 				
 				// Calculate PIT ticks required for data so far
 				switch (header.hardware)

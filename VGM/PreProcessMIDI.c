@@ -1,4 +1,5 @@
 #include "Common.h"
+#include "IBMPC.h"
 #include "PreProcessMIDI.h"
 
 typedef struct
@@ -25,7 +26,7 @@ float divisor = 0;		// Precalc this at every tempo-change
 // 1 microsecond == 1/10000000 second
 
 //#define MICROSEC_PER_TICK (tempo/(float)division)
-//#define DIVISOR	(MICROSEC_PER_TICK*(PITFREQ/1000000.0f))
+//#define DIVISOR	(MICROSEC_PER_TICK*(PC_PITFREQ/1000000.0f))
 //#define GETMIDIDELAY(x) ((uint32_t)((float)x*DIVISOR))
 #define GETMIDIDELAY(x) ((uint32_t)(x*divisor))
 
@@ -129,7 +130,7 @@ uint8_t huge* DoMetaEvent(uint8_t huge* pData)
 			pData += length;
 			
 			// Precalc the divisor for this tempo, for better performance
-			divisor = (tempo*(PITFREQ/1000000.0f))/division;
+			divisor = (tempo*(PC_PITFREQ/1000000.0f))/division;
 			break;
 		
 		// Skip
@@ -199,7 +200,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	}
 	
 	// Calculate a default tempo, in case there is no specific Meta-Event
-	divisor = (tempo*(PITFREQ/1000000.0f))/division;
+	divisor = (tempo*(PC_PITFREQ/1000000.0f))/division;
 	
 	// Read all tracks into memory
 	for (i = 0; i < nrOfTracks; i++)
