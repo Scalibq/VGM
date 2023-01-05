@@ -6,6 +6,7 @@
 #include <math.h>
 #include <malloc.h>
 #include <string.h>
+#include "PC98.h"
 #include "8253.h"
 #include "8259A.h"
 #include "MPU401.h"
@@ -715,19 +716,42 @@ void interrupt KeyHandler()
 	outp(PC_PIC1_COMMAND, OCW2_EOI);
 }
 
+void interrupt KeyHandlerPC98()
+{
+	uint8_t key;
+	uint8_t ack;
+	
+	// Read byte from keyboard
+	key = inp(0x41);
+	// Acknowledge keyboard
+	ack = inp(0x43);
+	ack |= 0x80;
+	outp(0x43, ack);
+	ack &= 0x7F;
+	outp(0x43, ack);
+	
+	if (key == 0)
+		playing = 0;
+	
+	outp(PC98_PIC1_COMMAND, OCW2_EOI);
+}
+
+uint16_t CTCMODECMDREG = PC_CTCMODECMDREG;
+uint16_t CHAN0PORT = PC_CHAN0PORT;
+
 void SetTimerRate(uint16_t rate)
 {
 	// Reset mode to trigger timer immediately
-	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	
-	outp(PC_CHAN0PORT, rate);
-	outp(PC_CHAN0PORT, rate >> 8);
+	outp(CHAN0PORT, rate);
+	outp(CHAN0PORT, rate >> 8);
 }
 
 void SetTimerCount(uint16_t rate)
 {
-	outp(PC_CHAN0PORT, rate);
-	outp(PC_CHAN0PORT, rate >> 8);
+	outp(CHAN0PORT, rate);
+	outp(CHAN0PORT, rate >> 8);
 }
 
 void InitHandler(void)
@@ -745,6 +769,12 @@ void InitKeyHandler(void)
 {
 	OldKeyHandler = _dos_getvect(0x1 + 0x8);
 	_dos_setvect(0x1 + 0x8, KeyHandler);
+}
+
+void InitKeyHandlerPC98(void)
+{
+	OldKeyHandler = _dos_getvect(0x1 + 0x8);
+	_dos_setvect(0x1 + 0x8, KeyHandlerPC98);
 }
 
 void DeinitKeyHandler(void)
@@ -899,7 +929,7 @@ void PlayInt(const char* pVGMFile)
 	_enable();
 	
 	// Unmask timer interrupts
-	outp(PC_PIC1_DATA, mask);
+	outp(PC_PIC1_DATA, mask & ~1);
 	
 	while (playing)
 	{
@@ -924,17 +954,62 @@ void PlayInt(const char* pVGMFile)
 	RestorePICState(machineType);
 }
 
-int IsPC98()
+void PlayIntPC98(const char* pVGMFile)
 {
-	// PC-98 has a very different implementation of INT 10h
-	// On a DOS machine, this call will return the current video mode
-	// On a PC-98, AH will not be overwritten
-	union REGPACK regs;
-	regs.h.ah = 0x0F;
-
-	intr(0x10, &regs);
+	uint8_t mask;
+	uint16_t far* pW;
 	
-	return (regs.h.ah == 0x0F);
+	PrepareFile(pVGMFile);
+	
+	// Int-based replay
+	// Setup auto-EOI
+	SetAutoEOI(MACHINE_PC98);
+	
+	_disable();
+	
+	// Set to rate generator
+	outp(PC98_CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	
+	// Mask timer interrupts
+	mask = inp(PC98_PIC1_DATA);
+	outp(PC98_PIC1_DATA, mask | 1);
+
+	// Have timer restart instantly
+	SetTimerCount(1);
+	
+	// Set first timer value
+	pW = (uint16_t far*)pBuf;
+	SetTimerCount(*pW++);
+	pBuf = (uint8_t far*)pW;
+	
+	InitHandler();
+	
+	_enable();
+	
+	// Unmask timer interrupts
+	outp(PC98_PIC1_DATA, mask & ~1);
+	
+	while (playing)
+	{
+		uint16_t minutes, seconds, ms;
+
+		//__asm hlt
+		
+		SplitTime(playTime / (PC_PITFREQ/1000L), &minutes, &seconds, &ms);
+
+		printf("\rTime: %u:%02u.%03u", minutes, seconds, ms);
+
+		if (pBuf > pEndBuf)
+			playing = 0;
+	}
+	
+	DeinitHandler();
+	
+	// Reset to square wave
+	outp(PC98_CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	SetTimerCount(0);
+	
+	RestorePICState(MACHINE_PC98);
 }
 
 int main(int argc, char* argv[])
@@ -945,7 +1020,12 @@ int main(int argc, char* argv[])
 	int pc98 = IsPC98();
 	
 	if (pc98)
+	{
 		printf("PC-98 machine detected!\n");
+		
+		CTCMODECMDREG = PC98_CTCMODECMDREG;
+		CHAN0PORT = PC98_CHAN0PORT;
+	}
 	else
 		printf("IBM PC machine detected!\n");
 	
@@ -1033,12 +1113,18 @@ int main(int argc, char* argv[])
 	else
 		SetYMF262(0, 0);
 	
-	InitKeyHandler();
+	if (pc98)
+		InitKeyHandlerPC98();
+	else
+		InitKeyHandler();
 	
 	//PlayPoll1(argv[1]);
 	//PlayPoll2(argv[1]);
 	//PlayPoll3(argv[1]);
-	PlayInt(argv[1]);
+	if (pc98)
+		PlayIntPC98(argv[1]);
+	else
+		PlayInt(argv[1]);
 	//PlayImmediate(argv[1]);
 	
 	DeinitKeyHandler();

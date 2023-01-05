@@ -279,7 +279,7 @@ void PlayData(void)
 		count = *pBuf++;
 
 #if defined(MPU401)		
-		OutputMIDI(MPUReg[i], pBuf, count);
+		OutputMIDI(MPUReg[i].command, pBuf, count);
 #elif defined(IMFC)
 		OutputMIDI(IMFCReg[i], pBuf, count);
 #elif defined(SB)
