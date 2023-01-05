@@ -738,6 +738,7 @@ void interrupt KeyHandlerPC98()
 
 uint16_t CTCMODECMDREG = PC_CTCMODECMDREG;
 uint16_t CHAN0PORT = PC_CHAN0PORT;
+uint16_t PIC1_DATA = PC_PIC1_DATA;
 
 void SetTimerRate(uint16_t rate)
 {
@@ -910,11 +911,11 @@ void PlayInt(const char* pVGMFile)
 	_disable();
 	
 	// Set to rate generator
-	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
 	
 	// Mask timer interrupts
-	mask = inp(PC_PIC1_DATA);
-	outp(PC_PIC1_DATA, mask | 1);
+	mask = inp(PIC1_DATA);
+	outp(PIC1_DATA, mask | 1);
 
 	// Have timer restart instantly
 	SetTimerCount(1);
@@ -929,7 +930,7 @@ void PlayInt(const char* pVGMFile)
 	_enable();
 	
 	// Unmask timer interrupts
-	outp(PC_PIC1_DATA, mask & ~1);
+	outp(PIC1_DATA, mask & ~1);
 	
 	while (playing)
 	{
@@ -948,68 +949,10 @@ void PlayInt(const char* pVGMFile)
 	DeinitHandler();
 	
 	// Reset to square wave
-	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
+	outp(CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
 	SetTimerCount(0);
 	
 	RestorePICState(machineType);
-}
-
-void PlayIntPC98(const char* pVGMFile)
-{
-	uint8_t mask;
-	uint16_t far* pW;
-	
-	PrepareFile(pVGMFile);
-	
-	// Int-based replay
-	// Setup auto-EOI
-	SetAutoEOI(MACHINE_PC98);
-	
-	_disable();
-	
-	// Set to rate generator
-	outp(PC98_CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
-	
-	// Mask timer interrupts
-	mask = inp(PC98_PIC1_DATA);
-	outp(PC98_PIC1_DATA, mask | 1);
-
-	// Have timer restart instantly
-	SetTimerCount(1);
-	
-	// Set first timer value
-	pW = (uint16_t far*)pBuf;
-	SetTimerCount(*pW++);
-	pBuf = (uint8_t far*)pW;
-	
-	InitHandler();
-	
-	_enable();
-	
-	// Unmask timer interrupts
-	outp(PC98_PIC1_DATA, mask & ~1);
-	
-	while (playing)
-	{
-		uint16_t minutes, seconds, ms;
-
-		//__asm hlt
-		
-		SplitTime(playTime / (PC_PITFREQ/1000L), &minutes, &seconds, &ms);
-
-		printf("\rTime: %u:%02u.%03u", minutes, seconds, ms);
-
-		if (pBuf > pEndBuf)
-			playing = 0;
-	}
-	
-	DeinitHandler();
-	
-	// Reset to square wave
-	outp(PC98_CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
-	SetTimerCount(0);
-	
-	RestorePICState(MACHINE_PC98);
 }
 
 int main(int argc, char* argv[])
@@ -1025,6 +968,7 @@ int main(int argc, char* argv[])
 		
 		CTCMODECMDREG = PC98_CTCMODECMDREG;
 		CHAN0PORT = PC98_CHAN0PORT;
+		PIC1_DATA = PC98_PIC1_DATA;
 	}
 	else
 		printf("IBM PC machine detected!\n");
@@ -1121,10 +1065,7 @@ int main(int argc, char* argv[])
 	//PlayPoll1(argv[1]);
 	//PlayPoll2(argv[1]);
 	//PlayPoll3(argv[1]);
-	if (pc98)
-		PlayIntPC98(argv[1]);
-	else
-		PlayInt(argv[1]);
+	PlayInt(argv[1]);
 	//PlayImmediate(argv[1]);
 	
 	DeinitKeyHandler();
