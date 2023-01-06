@@ -13,6 +13,8 @@ PreHeader preHeader = {
 	0,					// nrOfYMF262;
 	0,					// nrOfMIDI;
 	0,					// nrOfYM2151;
+	0,					// nrOfYM2203;
+	0,					// nrOfYM2608;
 };
 
 // Buffer format:
@@ -20,8 +22,8 @@ PreHeader preHeader = {
 // uint8_t data_count;
 // uint8_t data[data_count]
 
-uint8_t commands[MAX_MULTICHIP][NUM_CHIPS][(MAX_COMMANDS*MAX_COMMAND_SIZE)+1];	// We currently support a max count of 255 commands, and largest is 2 byte commands, count is stored first
-uint8_t* pCommands[MAX_MULTICHIP][NUM_CHIPS];
+uint8_t commands[1][NUM_CHIPS][(MAX_COMMANDS*MAX_COMMAND_SIZE)+1];	// We currently support a max count of 255 commands, and largest is 2 byte commands, count is stored first
+uint8_t* pCommands[1][NUM_CHIPS];
 
 uint16_t GetCommandLengthCount(uint16_t chip, uint16_t type, uint16_t *pLength)
 {
@@ -41,6 +43,9 @@ uint16_t GetCommandLengthCount(uint16_t chip, uint16_t type, uint16_t *pLength)
 		case YMF262PORT0:
 		case YMF262PORT1:
 		case YM2151:
+		case YM2203:
+		case YM2608PORT0:
+		case YM2608PORT1:
 			count >>= 1;
 			break;
 	}
@@ -97,7 +102,6 @@ void OutputCommands(FILE* pOut)
 
 		commands[i][YMF262PORT0][0] = count;
 		fwrite(commands[i][YMF262PORT0], length, 1, pOut);
-
 	}
 	
 	for (i = 0; i < preHeader.nrOfMIDI; i++)
@@ -115,6 +119,28 @@ void OutputCommands(FILE* pOut)
 		commands[i][YM2151][0] = count;
 		fwrite(commands[i][YM2151], length, 1, pOut);
 	}
+
+	for (i = 0; i < preHeader.nrOfYM2203; i++)
+	{
+		count = GetCommandLengthCount(i, YM2203, &length);
+
+		commands[i][YM2203][0] = count;
+		fwrite(commands[i][YM2203], length, 1, pOut);
+	}
+
+	for (i = 0; i < preHeader.nrOfYM2608; i++)
+	{
+		// First port 1 commands (includes global YM2608 config registers)
+		count = GetCommandLengthCount(i, YM2608PORT1, &length);
+
+		commands[i][YM2608PORT1][0] = count;
+		fwrite(commands[i][YM2608PORT1], length, 1, pOut);
+		
+		// Then port 0 commands
+		count = GetCommandLengthCount(i, YM2608PORT0, &length);
+
+		commands[i][YM2608PORT0][0] = count;
+		fwrite(commands[i][YM2608PORT0], length, 1, pOut);	}
 }
 
 void ClearCommands(void)

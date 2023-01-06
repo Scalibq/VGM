@@ -68,6 +68,18 @@ typedef struct
 	uint16_t data;
 } YM2151Reg;
 
+typedef struct
+{
+	uint16_t command;
+	uint16_t data;
+} YM2203Reg;
+
+typedef struct
+{
+	YM2203Reg port0;
+	YM2203Reg port1;
+} YM2608Reg;
+
 SN76489Reg SNReg[MAX_MULTICHIP] = { { 0xC0 }, { 0xC0 } };
 SAA1099Reg SAAReg[MAX_MULTICHIP] = { { 0x220, 0x221 }, { 0x222, 0x223 } };
 AY8930Reg AYReg[MAX_MULTICHIP] = { { 0x220, 0x224 }, { 0x220, 0x224 } };
@@ -77,6 +89,8 @@ MPU MPUReg[MAX_MULTICHIP] = { { 0x330, 0x331 }, { 0x330, 0x331 } };
 IMFC IMFCReg[MAX_MULTICHIP] = { { 0x2A20 }, { 0x2A20 } };
 uint16_t SBReg[MAX_MULTICHIP] = { 0x220, 0x240 };
 YM2151Reg YMReg[MAX_MULTICHIP] = { { 0x22E, 0x22F }, { 0x24E, 0x24F } };
+YM2203Reg YM03Reg[MAX_MULTICHIP] = { { 0x188, 0x18A }, { 0x188, 0x18A } };
+YM2608Reg YM08Reg[MAX_MULTICHIP] = { { { 0x188, 0x18A }, { 0x18C, 0x18E } }, { { 0x188, 0x18A }, { 0x18C, 0x18E } } };
 
 uint16_t lpt;
 bool opl322 = false;
@@ -123,6 +137,8 @@ void LoadPreprocessed(const char* pFileName)
 	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
 	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
 	printf("# YM2151: %u\n", preHeader.nrOfYM2151);
+	printf("# YM2203: %u\n", preHeader.nrOfYM2203);
+	printf("# YM2608: %u\n", preHeader.nrOfYM2608);
 	
 	// Search to start of data
 	fseek(pFile, preHeader.headerLen, SEEK_SET);
@@ -303,6 +319,50 @@ void PlayData(void)
 			outp(YMReg[i].data, *pBuf++);
 			for (j = 0; j < 3; j++)
 				delay = inp(YMReg[i].command);
+		}
+	}
+
+	for (i = 0; i < preHeader.nrOfYM2203; i++)
+	{
+		count = *pBuf++;
+	
+		while (count--)
+		{
+			outp(YM03Reg[i].command, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(YM03Reg[i].command);
+			outp(YM03Reg[i].data, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(YM03Reg[i].command);
+		}
+	}
+	
+	for (i = 0; i < preHeader.nrOfYM2608; i++)
+	{
+		// First port 1 commands
+		count = *pBuf++;
+			
+		while (count--)
+		{
+			outp(YM08Reg[i].port1.command, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(YM08Reg[i].port1.command);
+			outp(YM08Reg[i].port1.data, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(YM08Reg[i].port1.command);
+		}
+
+		// Then port 0 commands
+		count = *pBuf++;
+			
+		while (count--)
+		{
+			outp(YM08Reg[i].port0.command, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(YM08Reg[i].port0.command);
+			outp(YM08Reg[i].port0.data, *pBuf++);
+			for (j = 0; j < 3; j++)
+				delay = inp(YM08Reg[i].port0.command);
 		}
 	}
 }

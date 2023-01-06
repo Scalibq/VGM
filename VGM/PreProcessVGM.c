@@ -100,10 +100,17 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	preHeader.nrOfYM3812 = 0;
 	preHeader.nrOfYMF262 = 0;
 	preHeader.nrOfSAA1099 = 0;
-	
+	preHeader.nrOfYM2203 = 0;
+	preHeader.nrOfYM2608 = 0;
 
 	if (header.lngVersion >= 0x151)
 	{
+		if (dataOffset >= 0x48)
+			preHeader.nrOfYM2203 = (header.lngHzYM2203 != 0) + ((header.lngHzYM2203 & 0x40000000L) != 0);
+		
+		if (dataOffset >= 0x4C)
+			preHeader.nrOfYM2608 = (header.lngHzYM2608 != 0) + ((header.lngHzYM2608 & 0x40000000L) != 0);
+		
 		if (dataOffset >= 0x54)
 			preHeader.nrOfYM3812 = (header.lngHzYM3812 != 0) + ((header.lngHzYM3812 & 0x40000000L) != 0);
 		
@@ -127,6 +134,8 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
 	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
 	printf("# YM2151: %u\n", preHeader.nrOfYM2151);
+	printf("# YM2203: %u\n", preHeader.nrOfYM2203);
+	printf("# YM2608: %u\n", preHeader.nrOfYM2608);
 	
 	// Save header
 	_farfwrite(&preHeader, sizeof(preHeader), 1, pOut);
@@ -137,6 +146,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	while (playing)
 	{
 		uint8_t data[2];
+		DataBlock dataBlock;
 		uint32_t pos;
 		uint8_t value;
 
@@ -304,18 +314,47 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 				AddCommandMulti(1, YM2151, data[0], data[1], pOut);
 				break;
 		
+			case 0x55:	// aa dd : YM2203, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(0, YM2203, data[0], data[1], pOut);
+				break;
+				
+			case 0xA5:	// aa dd : Second YM2203, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(1, YM2203, data[0], data[1], pOut);
+				break;
+
+			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(0, YM2608PORT0, data[0], data[1], pOut);
+				break;
+
+			case 0x57:	// aa dd : YM2608 port 1, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(0, YM2608PORT1, data[0], data[1], pOut);
+				break;
+
+			case 0xA6:	// aa dd : Second YM2608 port 0, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(1, YM2608PORT0, data[0], data[1], pOut);
+				break;
+
+			case 0xA7:	// aa dd : Second YM2608 port 1, write value dd to register aa
+				fread(data, sizeof(data), 1, pFile);
+				AddCommandMulti(1, YM2608PORT1, data[0], data[1], pOut);
+				break;
+				
+			case 0x67:	// Data block: skip for now
+				fread(&dataBlock, sizeof(dataBlock), 1, pFile);
+				fseek(pFile, dataBlock.dataSize, SEEK_CUR);
+				break;
+
 			case 0x51:	// aa dd : YM2413, write value dd to register aa
 			case 0xA1:	// aa dd : Second YM2413, write value dd to register aa
 			case 0x52:	// aa dd : YM2612 port 0, write value dd to register aa
 			case 0x53:	// aa dd : YM2612 port 1, write value dd to register aa
 			case 0xA2:	// aa dd : Second Second YM2612 port 0, write value dd to register aa
 			case 0xA3:	// aa dd : Second YM2612 port 1, write value dd to register aa
-			case 0x55:	// aa dd : YM2203, write value dd to register aa
-			case 0xA5:	// aa dd : Second YM2203, write value dd to register aa
-			case 0x56:	// aa dd : YM2608 port 0, write value dd to register aa
-			case 0x57:	// aa dd : YM2608 port 1, write value dd to register aa
-			case 0xA6:	// aa dd : Second YM2608 port 0, write value dd to register aa
-			case 0xA7:	// aa dd : Second YM2608 port 1, write value dd to register aa
 			case 0x58:	// aa dd : YM2610 port 0, write value dd to register aa
 			case 0x59:	// aa dd : YM2610 port 1, write value dd to register aa
 			case 0xA8:	// aa dd : Second YM2610 port 0, write value dd to register aa
@@ -391,6 +430,18 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 		{
 			length = GetCommandLengthCount(i, YM2151, NULL);
 			minDelay += (YM2151_COMMAND_DURATION*length);
+		}
+
+		for (i = 0; i < preHeader.nrOfYM2203; i++)
+		{
+			length = GetCommandLengthCount(i, YM2203, NULL);
+			minDelay += (YM2203_COMMAND_DURATION*length);
+		}
+
+		for (i = 0; i < preHeader.nrOfYM2608; i++)
+		{
+			length = GetCommandLengthCount(i, YM2608PORT0, NULL) + GetCommandLengthCount(i, YM2608PORT1, NULL);
+			minDelay += (YM2608_COMMAND_DURATION*length);
 		}
 
 		if (delay > minDelay)
