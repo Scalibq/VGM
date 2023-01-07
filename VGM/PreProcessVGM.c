@@ -129,7 +129,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 			preHeader.nrOfAY8930 = (header.lngHzAY8910 != 0) + ((header.lngHzAY8910 & 0x40000000L) != 0);
 	}
 	
-	if (header.lngVersion >= 0x170)
+	if (header.lngVersion >= 0x171)
 	{
 		if (dataOffset >= 0xCC)
 			preHeader.nrOfSAA1099 = (header.lngHzSAA1099 != 0) + ((header.lngHzSAA1099 & 0x40000000L) != 0);
