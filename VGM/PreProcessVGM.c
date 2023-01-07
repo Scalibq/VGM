@@ -32,6 +32,55 @@ void InitDelayTable()
 	tableInited = 1;
 }
 
+void DetectChips(VGM_HEADER* pHeader, uint16_t dataOffset)
+{
+	// Detect used chips
+	preHeader.nrOfMIDI = 0;	// Not (yet?) supported in VGM
+	preHeader.nrOfSN76489 = (pHeader->lngHzPSG != 0) + ((pHeader->lngHzPSG & 0x40000000L) != 0);
+	preHeader.nrOfYM2151 = (pHeader->lngHzYM2151 != 0) + ((pHeader->lngHzYM2151 & 0x40000000L) != 0);
+	
+	preHeader.nrOfAY8930 = 0;
+	preHeader.nrOfYM3812 = 0;
+	preHeader.nrOfYMF262 = 0;
+	preHeader.nrOfSAA1099 = 0;
+	preHeader.nrOfYM2203 = 0;
+	preHeader.nrOfYM2608 = 0;
+
+	if (pHeader->lngVersion >= 0x151)
+	{
+		if (dataOffset >= 0x48)
+			preHeader.nrOfYM2203 = (pHeader->lngHzYM2203 != 0) + ((pHeader->lngHzYM2203 & 0x40000000L) != 0);
+		
+		if (dataOffset >= 0x4C)
+			preHeader.nrOfYM2608 = (pHeader->lngHzYM2608 != 0) + ((pHeader->lngHzYM2608 & 0x40000000L) != 0);
+		
+		if (dataOffset >= 0x54)
+			preHeader.nrOfYM3812 = (pHeader->lngHzYM3812 != 0) + ((pHeader->lngHzYM3812 & 0x40000000L) != 0);
+		
+		if (dataOffset >= 0x60)
+			preHeader.nrOfYMF262 = (pHeader->lngHzYMF262 != 0) + ((pHeader->lngHzYMF262 & 0x40000000L) != 0);
+
+		if (dataOffset >= 0x88)
+			preHeader.nrOfAY8930 = (pHeader->lngHzAY8910 != 0) + ((pHeader->lngHzAY8910 & 0x40000000L) != 0);
+	}
+	
+	if (pHeader->lngVersion >= 0x171)
+	{
+		if (dataOffset >= 0xCC)
+			preHeader.nrOfSAA1099 = (pHeader->lngHzSAA1099 != 0) + ((pHeader->lngHzSAA1099 & 0x40000000L) != 0);
+	}
+	
+	printf("# SN76489: %u\n", preHeader.nrOfSN76489);
+	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
+	printf("# AY8930: %u\n", preHeader.nrOfAY8930);
+	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
+	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
+	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
+	printf("# YM2151: %u\n", preHeader.nrOfYM2151);
+	printf("# YM2203: %u\n", preHeader.nrOfYM2203);
+	printf("# YM2608: %u\n", preHeader.nrOfYM2608);
+}
+
 void PreProcessVGM(FILE* pFile, const char* pOutFile)
 {
 	FILE* pOut;
@@ -99,51 +148,7 @@ void PreProcessVGM(FILE* pFile, const char* pOutFile)
 	
 	pOut = fopen(pOutFile, "wb");
 	
-	// Detect used chips
-	preHeader.nrOfMIDI = 0;	// Not (yet?) supported in VGM
-	preHeader.nrOfSN76489 = (header.lngHzPSG != 0) + ((header.lngHzPSG & 0x40000000L) != 0);
-	preHeader.nrOfYM2151 = (header.lngHzYM2151 != 0) + ((header.lngHzYM2151 & 0x40000000L) != 0);
-	
-	preHeader.nrOfAY8930 = 0;
-	preHeader.nrOfYM3812 = 0;
-	preHeader.nrOfYMF262 = 0;
-	preHeader.nrOfSAA1099 = 0;
-	preHeader.nrOfYM2203 = 0;
-	preHeader.nrOfYM2608 = 0;
-
-	if (header.lngVersion >= 0x151)
-	{
-		if (dataOffset >= 0x48)
-			preHeader.nrOfYM2203 = (header.lngHzYM2203 != 0) + ((header.lngHzYM2203 & 0x40000000L) != 0);
-		
-		if (dataOffset >= 0x4C)
-			preHeader.nrOfYM2608 = (header.lngHzYM2608 != 0) + ((header.lngHzYM2608 & 0x40000000L) != 0);
-		
-		if (dataOffset >= 0x54)
-			preHeader.nrOfYM3812 = (header.lngHzYM3812 != 0) + ((header.lngHzYM3812 & 0x40000000L) != 0);
-		
-		if (dataOffset >= 0x60)
-			preHeader.nrOfYMF262 = (header.lngHzYMF262 != 0) + ((header.lngHzYMF262 & 0x40000000L) != 0);
-
-		if (dataOffset >= 0x88)
-			preHeader.nrOfAY8930 = (header.lngHzAY8910 != 0) + ((header.lngHzAY8910 & 0x40000000L) != 0);
-	}
-	
-	if (header.lngVersion >= 0x171)
-	{
-		if (dataOffset >= 0xCC)
-			preHeader.nrOfSAA1099 = (header.lngHzSAA1099 != 0) + ((header.lngHzSAA1099 & 0x40000000L) != 0);
-	}
-	
-	printf("# SN76489: %u\n", preHeader.nrOfSN76489);
-	printf("# SAA1099: %u\n", preHeader.nrOfSAA1099);
-	printf("# AY8930: %u\n", preHeader.nrOfAY8930);
-	printf("# YM3812: %u\n", preHeader.nrOfYM3812);
-	printf("# YMF262: %u\n", preHeader.nrOfYMF262);
-	printf("# MIDI: %u\n", preHeader.nrOfMIDI);
-	printf("# YM2151: %u\n", preHeader.nrOfYM2151);
-	printf("# YM2203: %u\n", preHeader.nrOfYM2203);
-	printf("# YM2608: %u\n", preHeader.nrOfYM2608);
+	DetectChips(&header, dataOffset);
 	
 	// Save header
 	_farfwrite(&preHeader, sizeof(preHeader), 1, pOut);
