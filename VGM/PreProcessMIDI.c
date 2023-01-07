@@ -30,6 +30,13 @@ float divisor = 0;		// Precalc this at every tempo-change
 //#define GETMIDIDELAY(x) ((uint32_t)((float)x*DIVISOR))
 #define GETMIDIDELAY(x) ((uint32_t)(x*divisor))
 
+static double pitFactor = 0.0;
+
+void SetPITFreqMIDI(uint32_t pitFreq)
+{
+	pitFactor = (pitFreq/1000000.0);
+}
+
 // Variable-length integers are maximum 0FFFFFFF, so 28-bit.
 /*
 void WriteVarLen(FILE* pFile, uint32_t value)
@@ -130,7 +137,7 @@ uint8_t huge* DoMetaEvent(uint8_t huge* pData)
 			pData += length;
 			
 			// Precalc the divisor for this tempo, for better performance
-			divisor = (tempo*(PC_PITFREQ/1000000.0f))/division;
+			divisor = (tempo*pitFactor)/division;
 			break;
 		
 		// Skip
@@ -200,7 +207,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 	}
 	
 	// Calculate a default tempo, in case there is no specific Meta-Event
-	divisor = (tempo*(PC_PITFREQ/1000000.0f))/division;
+	divisor = (tempo*pitFactor)/division;
 	
 	// Read all tracks into memory
 	for (i = 0; i < nrOfTracks; i++)

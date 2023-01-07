@@ -33,7 +33,7 @@
 // MIDI is sent at 31250 bits per second
 //in 8-N-1 format, so 1 start bit and 1 stop bit added, no parity, 10 bits total
 // Which is 31250 / 10 = 3125 bytes per second
-#define MIDI_BYTE_DURATION	(PC_PITFREQ/3125)	// About 381 PIT ticks per MIDI byte
+#define MIDI_BYTE_DURATION	(381)//(PC_PITFREQ/3125)	// About 381 PIT ticks per MIDI byte
 #define INT_OVERHEAD (100)
 #define EPSILON 381
 

@@ -895,6 +895,17 @@ void PlayPoll3(const char* pVGMFile)
 	RestorePICState(machineType);
 }
 
+static uint32_t pitDiv = 0;
+
+void SetPITFreq(uint32_t pitFreq)
+{
+	pitDiv = (pitFreq/1000L);
+	
+	SetPITFreqVGM(pitFreq);
+	SetPITFreqDRO(pitFreq);
+	SetPITFreqMIDI(pitFreq);
+}
+
 void PlayInt(const char* pVGMFile)
 {
 	uint8_t mask;
@@ -938,7 +949,7 @@ void PlayInt(const char* pVGMFile)
 
 		//__asm hlt
 		
-		SplitTime(playTime / (PC_PITFREQ/1000L), &minutes, &seconds, &ms);
+		SplitTime(playTime / pitDiv, &minutes, &seconds, &ms);
 
 		printf("\rTime: %u:%02u.%03u", minutes, seconds, ms);
 
@@ -959,6 +970,7 @@ int main(int argc, char* argv[])
 {
 	FILE* pFile;
 	uint16_t i;
+	uint32_t pitFreq = 0;
 	
 	int pc98 = IsPC98();
 	
@@ -969,9 +981,18 @@ int main(int argc, char* argv[])
 		CTCMODECMDREG = PC98_CTCMODECMDREG;
 		CHAN0PORT = PC98_CHAN0PORT;
 		PIC1_DATA = PC98_PIC1_DATA;
+		
+		pitFreq = GetPITFreqPC98();
 	}
 	else
+	{
 		printf("IBM PC machine detected!\n");
+		
+		pitFreq = PC_PITFREQ;
+	}
+	
+	printf("PIT Frequency: %lu\n", pitFreq);
+	SetPITFreq(pitFreq);
 	
 	if (argc < 2)
 	{

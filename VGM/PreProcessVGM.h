@@ -16,10 +16,9 @@
 
 #define SampleRate 44100
 
-#define DIVISOR		(55411U)	/* (1193182.0f/44100.0f) * 2048 */
 #define	DIVISOR_SHIFT	(11U)
 
-#define GETDELAY(n)	((uint32_t)(n*(uint32_t)DIVISOR) >> DIVISOR_SHIFT)
+#define GETDELAY(n)	((uint32_t)(n*(uint32_t)divisor) >> DIVISOR_SHIFT)
 //#define GETDELAY(n)	((uint32_t)(((n*(1193182.0/44100.0))+0.5)))
 
 typedef struct
@@ -29,6 +28,7 @@ typedef struct
 	uint32_t dataSize;
 } DataBlock;
 
+void SetPITFreqVGM(uint32_t pitFreq);
 void PreProcessVGM(FILE* pFile, const char* pOutFile);
 void SplitTime(uint32_t time, uint16_t* pMinutes, uint16_t* pSeconds, uint16_t* pMillis);
 

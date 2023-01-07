@@ -2,6 +2,13 @@
 #include "IBMPC.h"
 #include "PreProcessDRO.h"
 
+static double pitFactor = 0.0;
+
+void SetPITFreqDRO(uint32_t pitFreq)
+{
+	pitFactor = (pitFreq/1000.0);
+}
+
 void PreProcessDRO(FILE* pFile, const char* pOutFile)
 {
 	DROHeader header;
@@ -88,7 +95,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 			if (totalDelay > 0)
 			{
 				// Convert to PIT ticks
-				delay = totalDelay*(PC_PITFREQ/1000.0);
+				delay = totalDelay*pitFactor;
 				
 				// Calculate PIT ticks required for data so far
 				switch (header.hardware)

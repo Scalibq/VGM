@@ -3,6 +3,14 @@
 uint32_t delayTable[4096];
 uint8_t tableInited = 0;
 
+static uint32_t divisor = 0;
+
+void SetPITFreqVGM(uint32_t pitFreq)
+{
+	//#define DIVISOR		(55411U)	/* (1193182.0f/44100.0f) * 2048 */
+	divisor = (pitFreq/44100.0) * 2048;
+}
+
 void SplitTime(uint32_t time, uint16_t* pMinutes, uint16_t* pSeconds, uint16_t* pMillis)
 {
 	*pMillis = time % 1000;
