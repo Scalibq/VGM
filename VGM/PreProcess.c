@@ -1,4 +1,5 @@
 #include "PreProcess.h"
+#include "Common.h"
 
 PreHeader preHeader = {
 	{'P','r','e','V'},	// marker
@@ -22,8 +23,8 @@ PreHeader preHeader = {
 // uint8_t data_count;
 // uint8_t data[data_count]
 
-uint8_t commands[1][NUM_CHIPS][(MAX_COMMANDS*MAX_COMMAND_SIZE)+1];	// We currently support a max count of 255 commands, and largest is 2 byte commands, count is stored first
-uint8_t* pCommands[1][NUM_CHIPS];
+uint8_t far commands[MAX_MULTICHIP][NUM_CHIPS][(MAX_COMMANDS*MAX_COMMAND_SIZE)+1];	// We currently support a max count of 255 commands, and largest is 2 byte commands, count is stored first
+uint8_t far* pCommands[MAX_MULTICHIP][NUM_CHIPS];
 
 uint16_t GetCommandLengthCount(uint16_t chip, uint16_t type, uint16_t *pLength)
 {
@@ -62,7 +63,7 @@ void OutputCommands(FILE* pOut)
 		count = GetCommandLengthCount(i, SN76489, &length);
 
 		commands[i][SN76489][0] = count;
-		fwrite(commands[i][SN76489], length, 1, pOut);
+		_farfwrite(commands[i][SN76489], length, 1, pOut);
 	}
 		
 	for (i = 0; i < preHeader.nrOfSAA1099; i++)
@@ -70,7 +71,7 @@ void OutputCommands(FILE* pOut)
 		count = GetCommandLengthCount(i, SAA1099, &length);
 
 		commands[i][SAA1099][0] = count;
-		fwrite(commands[i][SAA1099], length, 1, pOut);
+		_farfwrite(commands[i][SAA1099], length, 1, pOut);
 	}
 				
 	for (i = 0; i < preHeader.nrOfAY8930; i++)
@@ -78,7 +79,7 @@ void OutputCommands(FILE* pOut)
 		count = GetCommandLengthCount(i, AY8930, &length);
 
 		commands[i][AY8930][0] = count;
-		fwrite(commands[i][AY8930], length, 1, pOut);
+		_farfwrite(commands[i][AY8930], length, 1, pOut);
 	}
 
 	for (i = 0; i < preHeader.nrOfYM3812; i++)
@@ -86,7 +87,7 @@ void OutputCommands(FILE* pOut)
 		count = GetCommandLengthCount(i, YM3812, &length);
 
 		commands[i][YM3812][0] = count;
-		fwrite(commands[i][YM3812], length, 1, pOut);
+		_farfwrite(commands[i][YM3812], length, 1, pOut);
 	}
 
 	for (i = 0; i < preHeader.nrOfYMF262; i++)
@@ -95,13 +96,13 @@ void OutputCommands(FILE* pOut)
 		count = GetCommandLengthCount(i, YMF262PORT1, &length);
 
 		commands[i][YMF262PORT1][0] = count;
-		fwrite(commands[i][YMF262PORT1], length, 1, pOut);
+		_farfwrite(commands[i][YMF262PORT1], length, 1, pOut);
 		
 		// Then port 0 commands
 		count = GetCommandLengthCount(i, YMF262PORT0, &length);
 
 		commands[i][YMF262PORT0][0] = count;
-		fwrite(commands[i][YMF262PORT0], length, 1, pOut);
+		_farfwrite(commands[i][YMF262PORT0], length, 1, pOut);
 	}
 	
 	for (i = 0; i < preHeader.nrOfMIDI; i++)
@@ -109,7 +110,7 @@ void OutputCommands(FILE* pOut)
 		count = GetCommandLengthCount(i, MIDI, &length);
 	
 		commands[i][MIDI][0] = count;
-		fwrite(commands[i][MIDI], length, 1, pOut);
+		_farfwrite(commands[i][MIDI], length, 1, pOut);
 	}
 	
 	for (i = 0; i < preHeader.nrOfYM2151; i++)
@@ -117,7 +118,7 @@ void OutputCommands(FILE* pOut)
 		count = GetCommandLengthCount(i, YM2151, &length);
 
 		commands[i][YM2151][0] = count;
-		fwrite(commands[i][YM2151], length, 1, pOut);
+		_farfwrite(commands[i][YM2151], length, 1, pOut);
 	}
 
 	for (i = 0; i < preHeader.nrOfYM2203; i++)
@@ -125,7 +126,7 @@ void OutputCommands(FILE* pOut)
 		count = GetCommandLengthCount(i, YM2203, &length);
 
 		commands[i][YM2203][0] = count;
-		fwrite(commands[i][YM2203], length, 1, pOut);
+		_farfwrite(commands[i][YM2203], length, 1, pOut);
 	}
 
 	for (i = 0; i < preHeader.nrOfYM2608; i++)
@@ -134,13 +135,14 @@ void OutputCommands(FILE* pOut)
 		count = GetCommandLengthCount(i, YM2608PORT1, &length);
 
 		commands[i][YM2608PORT1][0] = count;
-		fwrite(commands[i][YM2608PORT1], length, 1, pOut);
+		_farfwrite(commands[i][YM2608PORT1], length, 1, pOut);
 		
 		// Then port 0 commands
 		count = GetCommandLengthCount(i, YM2608PORT0, &length);
 
 		commands[i][YM2608PORT0][0] = count;
-		fwrite(commands[i][YM2608PORT0], length, 1, pOut);	}
+		_farfwrite(commands[i][YM2608PORT0], length, 1, pOut);
+	}
 }
 
 void ClearCommands(void)
