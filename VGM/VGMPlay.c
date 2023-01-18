@@ -101,7 +101,7 @@ void tickWaitC(uint32_t numTicks, uint32_t* pCurrentTime)
 	} while (*pCurrentTime > targetTime);
 }
 
-int keypressed(uint8_t* pChar)
+int keypressed(uint8_t far* pChar)
 {
 	int ret;
 	union REGPACK regs;
@@ -698,8 +698,8 @@ void interrupt HandlerC(void)
 
 void interrupt KeyHandler()
 {
-	/*
 	uint8_t key;
+	/*
 	uint8_t ack;
 	
 	// Read byte from keyboard
@@ -714,14 +714,22 @@ void interrupt KeyHandler()
 	if (key == 1)
 		playing = 0;
 	
-	outp(PC_PIC1_COMMAND, OCW2_EOI);
+	//outp(PC_PIC1_COMMAND, OCW2_EOI);
 	*/
+	
+	OldKeyHandler();
+	if (keypressed(&key))
+	{
+		if (key == 0x1B)
+			playing = 0;
+	}
+}
 
+int keypressedPC98(uint8_t far* pChar)
+{
+	int ret;
 	union REGPACK regs;
 
-	OldKeyHandler();
-	
-	// Check if ESC pressed
 	/* Int 18h AH=01h
       * KEYBOARD - CHECK FOR KEYSTROKE
       *
@@ -736,17 +744,24 @@ void interrupt KeyHandler()
 
 	intr(0x18, &regs);
 	
-	if (regs.h.bh == 0x01)
+	ret = regs.h.bh;
+	
+	if (ret)
 	{
 		// Get keystroke
-		if (regs.h.ah == 0)
-			playing = 0;
+		regs.h.ah = 0x00;
+		intr(0x18, &regs);
+		if (pChar != NULL)
+			*pChar = regs.h.al;
 	}
+
+	return ret;
 }
 
 void interrupt KeyHandlerPC98()
 {
 	uint8_t key;
+	/*
 	uint8_t ack;
 	
 	// Read byte from keyboard
@@ -761,7 +776,15 @@ void interrupt KeyHandlerPC98()
 	if (key == 0)
 		playing = 0;
 	
-	outp(PC98_PIC1_COMMAND, OCW2_EOI);
+	//outp(PC98_PIC1_COMMAND, OCW2_EOI);
+	*/
+	
+	OldKeyHandler();
+	if (keypressedPC98(&key))
+	{
+		if (key == 0x1B)
+			playing = 0;
+	}
 }
 
 uint16_t CTCMODECMDREG = PC_CTCMODECMDREG;
