@@ -698,6 +698,7 @@ void interrupt HandlerC(void)
 
 void interrupt KeyHandler()
 {
+	/*
 	uint8_t key;
 	uint8_t ack;
 	
@@ -714,6 +715,33 @@ void interrupt KeyHandler()
 		playing = 0;
 	
 	outp(PC_PIC1_COMMAND, OCW2_EOI);
+	*/
+
+	union REGPACK regs;
+
+	OldKeyHandler();
+	
+	// Check if ESC pressed
+	/* Int 18h AH=01h
+      * KEYBOARD - CHECK FOR KEYSTROKE
+      *
+      * Return:
+      * BH - status
+      *    00h - if no keystroke available
+      *    01h - if keystroke available
+      * AH - BIOS scan code
+      * AL - ASCII character
+      */
+	regs.h.ah = 0x01;
+
+	intr(0x18, &regs);
+	
+	if (regs.h.bh == 0x01)
+	{
+		// Get keystroke
+		if (regs.h.ah == 0)
+			playing = 0;
+	}
 }
 
 void interrupt KeyHandlerPC98()
