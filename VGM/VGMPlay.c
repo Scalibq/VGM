@@ -746,13 +746,12 @@ int keypressedPC98(uint8_t far* pChar)
 	
 	ret = regs.h.bh;
 	
-	if (ret)
+	if (ret && (pChar != NULL))
 	{
 		// Get keystroke
 		regs.h.ah = 0x00;
 		intr(0x18, &regs);
-		if (pChar != NULL)
-			*pChar = regs.h.al;
+		*pChar = regs.h.al;
 	}
 
 	return ret;
