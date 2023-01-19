@@ -1007,6 +1007,9 @@ void PlayInt(const char* pVGMFile)
 			playing = 0;
 	}
 	
+	// Restore original mask
+	outp(PIC1_DATA, mask);
+
 	DeinitHandler();
 	
 	// Reset to square wave
