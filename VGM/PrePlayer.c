@@ -82,7 +82,7 @@ typedef struct
 
 SN76489Reg SNReg[MAX_MULTICHIP] = { { 0xC0 }, { 0xC0 } };
 SAA1099Reg SAAReg[MAX_MULTICHIP] = { { 0x220, 0x221 }, { 0x222, 0x223 } };
-AY8930Reg AYReg[MAX_MULTICHIP] = { { 0x220, 0x224 }, { 0x220, 0x224 } };
+AY8930Reg AYReg[MAX_MULTICHIP] = { { 0x188, 0x18A }, { 0x220, 0x224 } };
 OPL2 OPL2Reg[MAX_MULTICHIP] = { { 0x220, 0x221 }, { 0x222, 0x223 } };
 OPL3 OPL3Reg[MAX_MULTICHIP] = { { { 0x220, 0x221 }, { 0x222, 0x223 } }, { { 0x220, 0x221 }, { 0x222, 0x223 } } };
 MPU MPUReg[MAX_MULTICHIP] = { { 0x330, 0x331 }, { 0x330, 0x331 } };
@@ -731,9 +731,9 @@ void SetPCjrAudio(uint8_t chan, uint16_t freq, uint8_t volume)
 void InitPCSpeaker(void)
 {
 	// Enable speaker and tie input pin to CTC Chan 2 by setting bits 1 and 0
-	uint8_t ppi = inp(PPIPORTB);
+	uint8_t ppi = inp(PC_PPIPORTB);
 	ppi |= 0x3;
-	outp(PPIPORTB, ppi);
+	outp(PC_PPIPORTB, ppi);
 	
 	outp(PC_CTCMODECMDREG, CHAN2 | AMLOBYTE | MODE0 | BINARY);
 	outp(PC_CHAN2PORT, 0x01);	// Counter 2 count = 1 - terminate count quickly
@@ -742,9 +742,9 @@ void InitPCSpeaker(void)
 void ClosePCSpeaker(void)
 {
 	// Disable speaker by clearing bits 1 and 0
-	uint8_t ppi = inp(PPIPORTB);
+	uint8_t ppi = inp(PC_PPIPORTB);
 	ppi &= ~0x3;
-	outp(PPIPORTB, ppi);
+	outp(PC_PPIPORTB, ppi);
 	
 	// Reset timer
 	outp(PC_CTCMODECMDREG, CHAN2 | AMBOTH | MODE3 | BINARY);
