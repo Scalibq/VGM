@@ -696,6 +696,19 @@ void interrupt HandlerC(void)
 		playTime += delay;
 }
 
+void interrupt HandlerFixed(void)
+{
+	PlayData();
+	
+	// Handle looping
+	if (pBuf >= pLoopEnd)
+	{
+		pBuf = pLoopStart;
+	}
+
+	playTime += preHeader.speed;
+}
+
 void interrupt KeyHandler()
 {
 	uint8_t key;
@@ -809,6 +822,12 @@ void InitHandler(void)
 {
 	OldTimerHandler = _dos_getvect(0x0 + 0x8);
 	_dos_setvect(0x0 + 0x8, HandlerC);
+}
+
+void InitHandlerFixed(void)
+{
+	OldTimerHandler = _dos_getvect(0x0 + 0x8);
+	_dos_setvect(0x0 + 0x8, HandlerFixed);
 }
 
 void DeinitHandler(void)
@@ -978,15 +997,30 @@ void PlayInt(const char* pVGMFile)
 	mask = inp(PIC1_DATA);
 	outp(PIC1_DATA, mask | 1);
 
-	// Have timer restart instantly
-	SetTimerCount(1);
-	
-	// Set first timer value
-	pW = (uint16_t far*)pBuf;
-	SetTimerCount(*pW++);
-	pBuf = (uint8_t far*)pW;
-	
-	InitHandler();
+	if (preHeader.speed == 0)
+	{
+		// Have timer restart instantly
+		SetTimerCount(1);
+		
+		// Set first timer value
+		pW = (uint16_t far*)pBuf;
+		SetTimerCount(*pW++);
+		pBuf = (uint8_t far*)pW;
+		
+		InitHandler();
+	}
+	else
+	{
+		// Have timer restart instantly
+		SetTimerCount(1);
+		
+		printf("Fixed speed: %u\n", preHeader.speed);
+		
+		// Set fixed timer value
+		SetTimerCount(preHeader.speed);
+		
+		InitHandlerFixed();
+	}
 	
 	_enable();
 	

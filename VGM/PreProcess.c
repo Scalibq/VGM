@@ -207,24 +207,46 @@ void AddCommandBuffer(uint16_t chip, uint16_t type, uint8_t far* pCmds, uint16_t
 
 void AddDelay(uint32_t delay, FILE *pOut)
 {
-	// Break up into multiple delays with no notes
-	while (delay > 0)
+	if (preHeader.speed == 0)
 	{
-		uint16_t firstDelay;
+		// Break up into multiple delays with no notes
+		while (delay > 0)
+		{
+			uint16_t firstDelay;
+			
+			if (delay >= 65536L)
+			{
+				firstDelay = 0;
+				delay -= 65536L;
+			}
+			else
+			{
+				firstDelay = delay;
+				delay = 0;
+			}
 		
-		if (delay >= 65536L)
-		{
-			firstDelay = 0;
-			delay -= 65536L;
+			// First write delay value
+			fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
+			
+			// Now output commands
+			OutputCommands(pOut);
+			
+			// Reset command buffers
+			// (Next delays will get 0 notes exported)
+			ClearCommands();
 		}
-		else
+	}
+	else
+	{
+		// Insert 0 or more dummy blocks
+		uint16_t skip = delay / preHeader.speed;
+		uint16_t i;
+		
+		for (i = 1; i < skip; i++)
 		{
-			firstDelay = delay;
-			delay = 0;
+			uint16_t dummy = 0;
+			fwrite(&dummy, sizeof(dummy), 1, pOut);
 		}
-	
-		// First write delay value
-		fwrite(&firstDelay, sizeof(firstDelay), 1, pOut);
 		
 		// Now output commands
 		OutputCommands(pOut);

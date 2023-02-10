@@ -62,6 +62,7 @@ typedef struct _PreHeader
 	uint8_t nrOfYM2151;
 	uint8_t nrOfYM2203;
 	uint8_t nrOfYM2608;
+	uint16_t speed;
 } PreHeader;
 
 extern PreHeader preHeader;

@@ -45,6 +45,8 @@ void DetectChips(VGM_HEADER* pHeader, uint16_t dataOffset)
 	preHeader.nrOfSAA1099 = 0;
 	preHeader.nrOfYM2203 = 0;
 	preHeader.nrOfYM2608 = 0;
+	
+	preHeader.speed = 0;
 
 	if (pHeader->lngVersion >= 0x151)
 	{
@@ -81,6 +83,13 @@ void DetectChips(VGM_HEADER* pHeader, uint16_t dataOffset)
 	printf("# YM2608: %u\n", preHeader.nrOfYM2608);
 }
 
+#define DELAY_50HZ 0x1
+#define DELAY_60HZ 0x2
+#define DELAY_OTHER 0x4
+
+uint8_t delayFlag = 0;
+uint16_t fixedDelay = 0;
+
 void DetectChipsFromData(FILE* pFile)
 {
 	uint8_t playing = 1;
@@ -101,6 +110,7 @@ void DetectChipsFromData(FILE* pFile)
 		uint8_t data[2];
 		DataBlock dataBlock;
 		uint8_t value, i;
+		uint16_t srcDelay;
 
 		value = fgetc(pFile);
 		
@@ -113,10 +123,24 @@ void DetectChipsFromData(FILE* pFile)
 				
 			// Wait-commands
 			case 0x61:	// wait n samples
-				fseek(pFile, 2, SEEK_CUR);
+				delayFlag |= DELAY_OTHER;
+				fread(&srcDelay, sizeof(srcDelay), 1, pFile);
+				srcDelay = GETDELAY(srcDelay);
+				if (fixedDelay == 0)
+					fixedDelay = srcDelay;
+				else
+				{
+					if (fixedDelay != -1)
+						if (fixedDelay != srcDelay)
+							fixedDelay = -1;
+				}
 				break;
 			case 0x62:	// wait 1/60th second: 735 samples
+				delayFlag |= DELAY_60HZ;
+				break;
 			case 0x63:	// wait 1/50th second: 882 samples
+				delayFlag |= DELAY_50HZ;
+				break;
 			case 0x70:	// wait n+1 samples, n can range from 0 to 15.
 			case 0x71:	// wait n+1 samples, n can range from 0 to 15.
 			case 0x72:	// wait n+1 samples, n can range from 0 to 15.
@@ -133,6 +157,8 @@ void DetectChipsFromData(FILE* pFile)
 			case 0x7D:	// wait n+1 samples, n can range from 0 to 15.
 			case 0x7E:	// wait n+1 samples, n can range from 0 to 15.
 			case 0x7F:	// wait n+1 samples, n can range from 0 to 15.
+				delayFlag |= DELAY_OTHER;
+				fixedDelay = -1;
 				break;
 
 				// SN76489 commands
@@ -287,6 +313,23 @@ void DetectChipsFromData(FILE* pFile)
 	printf("# YM2151: %u\n", preHeader.nrOfYM2151);
 	printf("# YM2203: %u\n", preHeader.nrOfYM2203);
 	printf("# YM2608: %u\n", preHeader.nrOfYM2608);
+	
+	if (delayFlag == DELAY_50HZ)
+	{
+		printf("Speed: 50 Hz\n");
+		preHeader.speed = PC_PITFREQ/50;
+	}
+	else if (delayFlag == DELAY_60HZ)	
+	{
+		printf("Speed: 60 Hz\n");
+		preHeader.speed = PC_PITFREQ/60;
+	}
+	else
+	{
+		printf("Speed: other\n");
+		if (fixedDelay != -1)
+			preHeader.speed = fixedDelay;
+	}
 }
 
 void PreProcessVGM(FILE* pFile, const char* pOutFile)
