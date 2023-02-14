@@ -26,6 +26,10 @@ PreHeader struc
 	nrOfYM3812	db ?
 	nrOfYMF262	db ?
 	nrOfMIDI	db ?
+	nrOfYM2151	db ?
+	nrOfYM2203	db ?
+	nrOfYM2608	db ?
+	speed db ?
 PreHeader ends
 
 LOCALS @@
@@ -106,8 +110,8 @@ start:
 	call	ParseHex
 	inc		bx		; Parameter is base+2
 	inc		bx
-	mov		word ptr es:[patchPort+1], bx		; Patch LPT1 address into code
-	mov		word ptr cs:[patchPort1+1], bx		; Patch LPT1 address into init routine
+	;mov		word ptr es:[patchPort+1], bx		; Patch LPT1 address into code
+	;mov		word ptr cs:[patchPort1+1], bx		; Patch LPT1 address into init routine
 	
 @@endCmdLine:	
 	; Swap @data back to DS and PSP back to ES
@@ -253,10 +257,14 @@ patchPort1:
 	pop     ds
 
 	; Now initialize the counter with the first count
-	seges lodsb
-	out CHAN0PORT, al
-	seges lodsb
-	out CHAN0PORT, al
+	;seges lodsb
+	;out PC_CHAN0PORT, al
+	;seges lodsb
+	;out PC_CHAN0PORT, al
+	mov ax, 19912
+	out PC_CHAN0PORT, al
+	xchg al, ah
+	out PC_CHAN0PORT, al
 
 	sti
 	
@@ -494,7 +502,7 @@ TimerHandler proc
 	
 	; Load pointer to stream
 sampleBufIns:
-	mov si, 0002h	; Start at byte 2, to skip the first delay command
+	mov si, 0;0002h	; Start at byte 2, to skip the first delay command
 	
 	; Get note count
 	segcs lodsb
@@ -506,65 +514,20 @@ sampleBufIns:
 	xor cx, cx
 	mov cl, al
 	
-	push bx
-	push dx
-	;mov dx, 0388h
-	
-	;jmp enterLoop
-	
-;noteLoop:
-;rept 35
-    ;in      al,dx
-;endm
-	;dec dx
-
-;enterLoop:
-	;segcs lodsb
-	;out	dx,al
-;rept 6
-    ;in      al,dx
-;endm
-
-    ;inc     dx
-	;segcs lodsb
-	;out	dx,al
-	
-	;loop noteLoop
-	
-
-; ======================
-;noteLoop:
-;	segcs lodsb
-;	xchg ax, bx
-;	WriteOPL2LPTAddr LPT_BASE, bl
-	
-;	segcs lodsb
-;	xchg ax, bx
-;	WriteOPL2LPTData LPT_BASE, bl
-
-;	loop noteLoop
-; ======================
-
-patchPort:
-	mov dx, LPT_BASE+2
-
 noteLoop:
 	segcs lodsb
-	xchg ax, bx
-	WriteDBS2PDataReg bl
+	out 0C0h, al
 	
 	loop noteLoop
 
-	pop dx
-	pop bx
 	pop cx
 		
 endHandler:
 	; Get delay value from stream
-	segcs lodsb
-	out CHAN0PORT, al
-	segcs lodsb
-	out CHAN0PORT, al
+	;segcs lodsb
+	;out PC_CHAN0PORT, al
+	;segcs lodsb
+	;out PC_CHAN0PORT, al
 
 	; Update pointer
 sampleBufInc:
