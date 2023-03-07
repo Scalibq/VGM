@@ -1,0 +1,3 @@
+[submodule "COMMON"]
+	path = COMMON
+	url = https://github.com/Scalibq/DOS_SDK.git
