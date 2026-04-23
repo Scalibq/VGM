@@ -19,6 +19,8 @@
 #include "PreProcess.h"
 #include "PrePlayer.h"
 #include "PreProcessMIDI.h"
+#include "MIDI.h"
+#include "32bit.h"
 
 #define SNFreq 3579540
 

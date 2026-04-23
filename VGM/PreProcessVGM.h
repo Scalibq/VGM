@@ -1,18 +1,9 @@
 #ifndef _PREPROCESSVGM_H_
 #define _PREPROCESSVGM_H_
 
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <dos.h>
-#include <conio.h>
-#include <math.h>
-#include <malloc.h>
-#include <string.h>
-#include "Common.h"
 #include "stdtype.h"	// VGMFile.h uses nonstandard types, define them separately
 #include "VGMFile.h"
-#include "PreProcess.h"
 
 #define SampleRate 44100
 

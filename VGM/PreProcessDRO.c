@@ -1,6 +1,6 @@
-#include "Common.h"
-#include "IBMPC.h"
 #include "PreProcessDRO.h"
+#include "PreProcess.h"
+#include "DRO.h"
 
 static double pitFactor = 0.0;
 

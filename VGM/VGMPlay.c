@@ -6,6 +6,7 @@
 #include <math.h>
 #include <malloc.h>
 #include <string.h>
+#include "IBMPC.h"
 #include "PC98.h"
 #include "8253.h"
 #include "8259A.h"
@@ -20,8 +21,9 @@
 #include "PreProcessMIDI.h"
 #include "PreProcessDRO.h"
 #include "PrePlayer.h"
-
-uint16_t lpt = 0x378;
+#include "MIDI.h"
+#include "DRO.h"
+#include "32bit.h"
 
 void SetTimerCount(uint16_t rate);
 
@@ -32,6 +34,7 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 
 	targetTime = *pCurrentTime - numTicks;
 	
+#if !defined(M_I386)
 	__asm
 	{
 		mov di, [pCurrentTime]
@@ -64,6 +67,7 @@ void tickWait(uint32_t numTicks, uint32_t* pCurrentTime)
 		mov [di], dx
 		mov [di+2], bx
 	}
+#endif
 }
 
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
@@ -101,22 +105,24 @@ void tickWaitC(uint32_t numTicks, uint32_t* pCurrentTime)
 	} while (*pCurrentTime > targetTime);
 }
 
-int keypressed(uint8_t far* pChar)
+int keypressed(uint8_t __far* pChar)
 {
 	int ret;
-	union REGPACK regs;
+	union REGPACK regs = { 0 };
+
 	regs.h.ah = 1;
 
 	intr(0x16, &regs);
 	
 	ret = !(regs.x.flags & INTR_ZF);     // Check zero-flag
 	
-	if (ret && (pChar != NULL))
+	if (ret)
 	{
 		// Get keystroke
 		regs.h.ah = 0;
 		intr(0x16, &regs);
-		*pChar = regs.h.al;
+		if (pChar != NULL)
+			*pChar = regs.h.al;
 	}
 
 	return ret;
@@ -731,17 +737,22 @@ void interrupt KeyHandler()
 	*/
 	
 	OldKeyHandler();
-	if (keypressed(&key))
+	/*if (keypressed(&key))
 	{
 		if (key == 0x1B)
+			playing = 0;
+	}*/
+	if (kbhit())
+	{
+		if (getch() == 0x1B)
 			playing = 0;
 	}
 }
 
-int keypressedPC98(uint8_t far* pChar)
+int keypressedPC98(uint8_t __far* pChar)
 {
 	int ret;
-	union REGPACK regs;
+	union REGPACK regs = { 0 };
 
 	/* Int 18h AH=01h
       * KEYBOARD - CHECK FOR KEYSTROKE
@@ -759,12 +770,13 @@ int keypressedPC98(uint8_t far* pChar)
 	
 	ret = regs.h.bh;
 	
-	if (ret && (pChar != NULL))
+	if (ret)
 	{
 		// Get keystroke
 		regs.h.ah = 0x00;
 		intr(0x18, &regs);
-		*pChar = regs.h.al;
+		if (pChar != NULL)
+			*pChar = regs.h.al;
 	}
 
 	return ret;
@@ -979,12 +991,31 @@ void PlayInt(const char* pVGMFile)
 {
 	uint8_t mask;
 	uint16_t far* pW;
+	char* strMT = "unknown";
 	
 	PrepareFile(pVGMFile);
 	
 	// Int-based replay
 	// Setup auto-EOI
 	machineType = GetMachineType();
+	
+	switch (machineType)
+	{
+		case MACHINE_PCXT:
+			strMT = "PC/XT";
+			break;
+		case MACHINE_PCAT:
+			strMT = "PC/AT";
+			break;
+		case MACHINE_PS2:
+			strMT = "PS/2";
+			break;
+		case MACHINE_PC98:
+			strMT = "PC98";
+			break;
+	}
+	
+	printf("Machinetype detected: %s\n", strMT);
 	
 	SetAutoEOI(machineType);
 	

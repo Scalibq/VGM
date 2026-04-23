@@ -1,6 +1,11 @@
+#include <stdlib.h>
+#include <memory.h>
 #include "Common.h"
-#include "IBMPC.h"
+#include "PreProcess.h"
 #include "PreProcessMIDI.h"
+#include "MIDI.h"
+#include "Endianness.h"
+#include "32bit.h"
 
 typedef struct
 {

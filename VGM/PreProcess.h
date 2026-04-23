@@ -3,14 +3,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <dos.h>
-#include <math.h>
-#include <malloc.h>
-#include <string.h>
-#include "IBMPC.h"
-#include "8253.h"
-#include "Endianness.h"
+#include "32bit.h"
 
 // Index for each sound chip in a command stream
 #define SN76489 0

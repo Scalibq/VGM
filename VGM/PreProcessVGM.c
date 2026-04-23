@@ -1,4 +1,7 @@
+#include "Common.h"
 #include "PreProcessVGM.h"
+#include "PreProcess.h"
+#include "IBMPC.h"
 
 uint32_t delayTable[4096];
 uint8_t tableInited = 0;
