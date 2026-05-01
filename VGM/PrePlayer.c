@@ -15,6 +15,8 @@
 #include "SB.h"
 #include "DBS2P.h"
 #include "OPL2LPT.h"
+#include "OPL3LPT.h"
+#include "TNDLPT.h"
 #include "Endianness.h"
 #include "PreProcess.h"
 #include "PrePlayer.h"
@@ -23,6 +25,7 @@
 #include "32bit.h"
 
 #define SNFreq 3579540
+#define TNDLPT
 
 typedef struct
 {
@@ -167,8 +170,12 @@ void PlayData(void)
 	{
 		count = *pBuf++;
 		while (count--)
+#if defined(TNDLPT)
+			WriteTNDLPT(lpt, *pBuf++);
+#else
 			outp(SNReg[i].command, *pBuf++);
-	}
+#endif
+}
 		
 	for (i = 0; i < preHeader.nrOfSAA1099; i++)
 	{

@@ -25,6 +25,8 @@
 #include "DRO.h"
 #include "32bit.h"
 
+#define TNDLPT
+
 void SetTimerCount(uint16_t rate);
 
 // Waits for numTicks to elapse, where a tick is 1/PIT Frequency (~1193182)
@@ -1172,6 +1174,9 @@ int main(int argc, char* argv[])
 	InitPCjrAudio();
 	//SetPCjrAudio(1,440,15);
 	//InitPCSpeaker();
+#if defined(TNDLPT)
+	InitTNDLPT(lpt);
+#endif
 #if defined(MPU401)
 	InitMPU401();
 #elif defined(IMFC)
