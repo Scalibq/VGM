@@ -15,6 +15,7 @@
 #include "SB.h"
 #include "DBS2P.h"
 #include "OPL2LPT.h"
+#include "TNDLPT.h"
 #include "Endianness.h"
 #include "PreProcess.h"
 #include "PreProcessVGM.h"
@@ -24,8 +25,6 @@
 #include "MIDI.h"
 #include "DRO.h"
 #include "32bit.h"
-
-#define TNDLPT
 
 void SetTimerCount(uint16_t rate);
 

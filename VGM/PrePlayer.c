@@ -25,7 +25,6 @@
 #include "32bit.h"
 
 #define SNFreq 3579540
-#define TNDLPT
 
 typedef struct
 {
