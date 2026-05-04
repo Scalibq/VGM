@@ -114,6 +114,7 @@ void DetectChipsFromData(FILE* pFile)
 		DataBlock dataBlock;
 		uint8_t value, i;
 		uint16_t srcDelay;
+		uint32_t delay;
 
 		value = fgetc(pFile);
 		
@@ -128,15 +129,22 @@ void DetectChipsFromData(FILE* pFile)
 			case 0x61:	// wait n samples
 				delayFlag |= DELAY_OTHER;
 				fread(&srcDelay, sizeof(srcDelay), 1, pFile);
-				srcDelay = GETDELAY(srcDelay);
-				if (fixedDelay == 0)
-					fixedDelay = srcDelay;
-				else
+				delay = GETDELAY(srcDelay);
+				if (delay <= 65535)
 				{
-					if (fixedDelay != -1)
-						if (fixedDelay != srcDelay)
-							fixedDelay = -1;
+					if (fixedDelay == 0)
+						fixedDelay = delay;
+					else
+					{
+						if (fixedDelay != (uint16_t)-1)
+						{
+							if (fixedDelay != delay)
+								fixedDelay = -1;
+						}
+					}
 				}
+				else
+					fixedDelay = -1;
 				break;
 			case 0x62:	// wait 1/60th second: 735 samples
 				delayFlag |= DELAY_60HZ;
@@ -330,7 +338,7 @@ void DetectChipsFromData(FILE* pFile)
 	else
 	{
 		printf("Speed: other\n");
-		if (fixedDelay != -1)
+		if (fixedDelay != (uint16_t)-1)
 			preHeader.speed = fixedDelay;
 	}
 }
