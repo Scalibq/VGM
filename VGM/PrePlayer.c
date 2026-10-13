@@ -17,6 +17,7 @@
 #include "OPL2LPT.h"
 #include "OPL3LPT.h"
 #include "TNDLPT.h"
+#include "CMSLPT.h"
 #include "Endianness.h"
 #include "PreProcess.h"
 #include "PrePlayer.h"
@@ -182,8 +183,21 @@ void PlayData(void)
 	
 		while (count--)
 		{
+#if defined(CMSLPT)
+			if (i == 0)
+			{
+				WriteCMSLPTPort0Addr(lpt, *pBuf++);
+				WriteCMSLPTPort0Data(lpt, *pBuf++);
+			}
+			else if (i == 1)
+			{
+				WriteCMSLPTPort1Addr(lpt, *pBuf++);
+				WriteCMSLPTPort1Data(lpt, *pBuf++);
+			}
+#else
 			outp(SAAReg[i].command, *pBuf++);
 			outp(SAAReg[i].data, *pBuf++);
+#endif
 		}
 	}
 				
@@ -204,10 +218,6 @@ void PlayData(void)
 	
 		while (count--)
 		{
-#if defined(OPL2LPT)
-			WriteOPL2LPTAddr(lpt, *pBuf++);
-			WriteOPL2LPTData(lpt, *pBuf++);
-#else
 			// OPL3-compatible mode for dual OPL2
 			if (opl322)
 			{
@@ -231,12 +241,17 @@ void PlayData(void)
 						data |= 0x20;
 					}
 					
+#if defined(OPL3LPT)
+					WriteOPL3LPTPort1Addr(lpt, idx);
+					WriteOPL3LPTData(lpt, data);
+#else
 					outp(OPL3Reg[o].port1.command, idx);
 					for (j = 0; j < 3; j++)
 						delay = inp(OPL3Reg[o].port1.command);
 					outp(OPL3Reg[o].port1.data, data);
 					for (j = 0; j < 3; j++)
 						delay = inp(OPL3Reg[o].port1.command);
+#endif
 				}
 				else
 				{
@@ -247,6 +262,10 @@ void PlayData(void)
 						data |= 0x10;
 					}
 
+#if defined(OPL3LPT)
+					WriteOPL3LPTPort0Addr(lpt, idx);
+					WriteOPL3LPTData(lpt, data);
+#else
 					// Send to port 0 of OPL3
 					outp(OPL3Reg[o].port0.command, idx);
 					for (j = 0; j < 3; j++)
@@ -254,18 +273,23 @@ void PlayData(void)
 					outp(OPL3Reg[o].port0.data, data);
 					for (j = 0; j < 3; j++)
 						delay = inp(OPL3Reg[o].port0.command);
+#endif
 				}
 			}
 			else
 			{
+#if defined(OPL2LPT)
+				WriteOPL2LPTAddr(lpt, *pBuf++);
+				WriteOPL2LPTData(lpt, *pBuf++);
+#else
 				outp(OPL2Reg[i].command, *pBuf++);
 				for (j = 0; j < 6; j++)
 					delay = inp(OPL2Reg[i].command);
 				outp(OPL2Reg[i].data, *pBuf++);
 				for (j = 0; j < 35; j++)
 					delay = inp(OPL2Reg[i].command);
-			}
 #endif
+			}
 		}
 	}
 		
@@ -276,12 +300,17 @@ void PlayData(void)
 			
 		while (count--)
 		{
+#if defined(OPL3LPT)
+			WriteOPL3LPTPort1Addr(lpt, *pBuf++);
+			WriteOPL3LPTData(lpt, *pBuf++);
+#else
 			outp(OPL3Reg[i].port1.command, *pBuf++);
 			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i].port1.command);
 			outp(OPL3Reg[i].port1.data, *pBuf++);
 			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i].port1.command);
+#endif
 		}
 
 		// Then port 0 commands
@@ -289,12 +318,17 @@ void PlayData(void)
 			
 		while (count--)
 		{
+#if defined(OPL3LPT)
+			WriteOPL3LPTPort0Addr(lpt, *pBuf++);
+			WriteOPL3LPTData(lpt, *pBuf++);
+#else
 			outp(OPL3Reg[i].port0.command, *pBuf++);
 			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i].port0.command);
 			outp(OPL3Reg[i].port0.data, *pBuf++);
 			for (j = 0; j < 3; j++)
 				delay = inp(OPL3Reg[i].port0.command);
+#endif
 		}
 	}
 	
@@ -789,63 +823,93 @@ void SetYMF262(uint8_t opl3, uint8_t fourOp)
 	
 	// Enable OPL3-mode so both ports can be reset
 	// Enable OPL3 mode
+#if defined(OPL3LPT)
+	WriteOPL3LPTPort1Addr(lpt, 5);
+	WriteOPL3LPTData(lpt, 1);
+#else
 	outp(OPL3Reg[0].port1.command, 5);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[0].port1.command);
 	outp(OPL3Reg[0].port1.data, 1);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[0].port1.command);
+#endif
 	
 	// Write 0 to all YMF262 registers
 	// First port
 	for (r = 0; r < 256; r++)
 	{
+#if defined(OPL3LPT)
+		WriteOPL3LPTPort0Addr(lpt, r);
+		WriteOPL3LPTData(lpt, 0);
+#else
 		outp(OPL3Reg[0].port0.command, r);
 		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[0].port0.command);
 		outp(OPL3Reg[0].port0.data, 0);
 		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[0].port0.command);
+#endif
 	}
 
 	// Second port
 	for (r = 0; r < 4; r++)
 	{
+#if defined(OPL3LPT)
+		WriteOPL3LPTPort1Addr(lpt, r);
+		WriteOPL3LPTData(lpt, 0);
+#else
 		outp(OPL3Reg[0].port1.command, r);
 		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[0].port1.command);
 		outp(OPL3Reg[0].port1.data, 0);
 		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[0].port1.command);
+#endif
 	}
 	
 	// Skip registers 4 and 5, they enable/disable OPL3 functionalities	
 	for (r = 6; r < 255; r++)
 	{
+#if defined(OPL3LPT)
+		WriteOPL3LPTPort1Addr(lpt, r);
+		WriteOPL3LPTData(lpt, 0);
+#else
 		outp(OPL3Reg[0].port1.command, r);
 		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[0].port1.command);
 		outp(OPL3Reg[0].port1.data, 0);
 		for (j = 0; j < 3; j++)
 			delay = inp(OPL3Reg[0].port1.command);
+#endif
 	}
 	
 	// Enable 4-OP mode
 	// Second port
+#if defined(OPL3LPT)
+	WriteOPL3LPTPort1Addr(lpt, 4);
+	WriteOPL3LPTData(lpt, fourOp);
+#else
 	outp(OPL3Reg[0].port1.command, 4);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[0].port1.command);
 	outp(OPL3Reg[0].port1.data, fourOp);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[0].port1.command);
+#endif
 
 	// Enable OPL3 mode
+#if defined(OPL3LPT)
+	WriteOPL3LPTPort1Addr(lpt, 5);
+	WriteOPL3LPTData(lpt, opl3);
+#else
 	outp(OPL3Reg[0].port1.command, 5);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[0].port1.command);
 	outp(OPL3Reg[0].port1.data, opl3);
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[0].port1.command);
+#endif
 }
 
 void ResetYMF262(void)

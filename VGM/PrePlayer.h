@@ -7,8 +7,10 @@
 //#define IMFC
 //#define SB
 //#define DBS2P
-//#define OPL2LPT
+#define OPL2LPT
+#define OPL3LPT
 #define TNDLPT
+#define CMSLPT
 
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
 
