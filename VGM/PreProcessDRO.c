@@ -154,7 +154,7 @@ void PreProcessDRO(FILE* pFile, const char* pOutFile)
 	}
 	
 	// Output last delay of 0
-	AddDelay(0, pOut);
+	AddDelay(65536L, pOut);
 
 	// And a final delay of 0, which would get fetched by the last int handler
 	firstDelay = 0;

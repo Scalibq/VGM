@@ -238,9 +238,7 @@ void PreProcessMIDI(FILE* pFile, const char* pOutFile)
 		_farfread(tracks[i].pData, track.length, 1, pFile);
 		tracks[i].pCur = tracks[i].pData;
 	}
-	
-	fclose(pFile);
-	
+
 	// Reset all pointers
 	ClearCommands();
 	
