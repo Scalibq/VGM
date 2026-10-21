@@ -24,6 +24,7 @@
 #include "PrePlayer.h"
 #include "MIDI.h"
 #include "DRO.h"
+#include "Output.h"
 #include "32bit.h"
 
 void SetTimerCount(uint16_t rate);
@@ -920,6 +921,9 @@ void PrepareFile(const char* pVGMFile)
 void PlayPoll1(const char* pVGMFile)
 {
 	PrepareFile(pVGMFile);
+
+	GetDevices();
+	InitDevices();
 		
 	// Set to rate generator
 	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE2);
@@ -931,11 +935,16 @@ void PlayPoll1(const char* pVGMFile)
 	// Reset to square wave
 	outp(PC_CTCMODECMDREG, CHAN0 | AMBOTH | MODE3);
 	SetTimerCount(0);
+
+	DeInitDevices();
 }
 
 void PlayPoll2(const char* pVGMFile)
 {
 	PrepareFile(pVGMFile);
+
+	GetDevices();
+	InitDevices();
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
@@ -953,11 +962,16 @@ void PlayPoll2(const char* pVGMFile)
 	SetTimerCount(0);
 	
 	RestorePICState(machineType);
+
+	DeInitDevices();
 }
 
 void PlayPoll3(const char* pVGMFile)
 {
 	PrepareFile(pVGMFile);
+
+	GetDevices();
+	InitDevices();
 	
 	// Setup auto-EOI
 	machineType = GetMachineType();
@@ -975,6 +989,8 @@ void PlayPoll3(const char* pVGMFile)
 	SetTimerCount(0);
 	
 	RestorePICState(machineType);
+
+	DeInitDevices();
 }
 
 static uint32_t pitDiv = 0;
@@ -995,6 +1011,9 @@ void PlayInt(const char* pVGMFile)
 	char* strMT = "unknown";
 	
 	PrepareFile(pVGMFile);
+
+	GetDevices();
+	InitDevices();
 	
 	// Int-based replay
 	// Setup auto-EOI
@@ -1083,6 +1102,8 @@ void PlayInt(const char* pVGMFile)
 	SetTimerCount(0);
 	
 	RestorePICState(machineType);
+
+	DeInitDevices();
 }
 
 int main(int argc, char* argv[])
@@ -1131,17 +1152,6 @@ int main(int argc, char* argv[])
 	
 	fclose(pFile);
 	
-	// Parse port
-/*	if (argc > 2)
-		sscanf(argv[2], "%X", &SNReg[0]);
-
-	printf("Using SN76489 at port %Xh\n", SNReg[0]);*/
-	
-	if (argc > 2)
-		sscanf(argv[2], "%X", &lpt);
-
-	printf("Using LPT at port %Xh\n", lpt);
-	
 	for (i = 1; i < argc; i++)
 	{
 		if (stricmp(argv[i], "/mt32") == 0)
@@ -1150,56 +1160,8 @@ int main(int argc, char* argv[])
 			
 			printf("DreamBlaster S2(P) MT-32 mode enabled.\n");
 		}
-		else if (stricmp(argv[i], "/opl3") == 0)
-		{
-			if (argc >= (i+1))
-			{
-				uint16_t opl3;
-				sscanf(argv[i+1], "%X", &opl3);
-				
-				SetOPL3(opl3);
-				
-				printf("OPL3 address set to: %Xh\n", opl3);
-			}
-		}
-		else if (stricmp(argv[i], "/opl322") == 0)
-		{
-			opl322 = true;
-
-			printf("OPL3 compatibility for dual OPL2 enabled\n");
-		}
 	}
-	
-	InitPCjrAudio();
-	//SetPCjrAudio(1,440,15);
-	//InitPCSpeaker();
-#if defined(TNDLPT)
-	InitTNDLPT(lpt);
-#endif
-#if defined(MPU401)
-	InitMPU401();
-#elif defined(IMFC)
-	InitIMFCAll();
-#elif defined(SB)
-	InitSB();
-#elif defined(DBS2P)
-	InitDBS2P(lpt);
-#endif
-
-	// Set up channels to play samples, by setting frequency 0
-	//SetPCjrAudio(0,0,15);
-	//SetPCjrAudio(1,0,15);
-	//SetPCjrAudio(2,0,15);
-	
-	//InitSampleSN76489();
-	//InitSamplePIT();
-	
-	ResetYM3812();
-	if (opl322)
-		SetYMF262(1, 0);
-	else
-		SetYMF262(0, 0);
-	
+		
 	if (pc98)
 		InitKeyHandlerPC98();
 	else
@@ -1215,31 +1177,5 @@ int main(int argc, char* argv[])
 	
 	farfree(pPreprocessed);
 	
-	//DeinitSample();
- 
-	{
-		int chan;
-		for (chan = 0; chan < 3; chan++)
-			SetPCjrAudio(chan,440,15);
-		
-		// Disable noise channel
-		SetPCjrAudioVolume(3,15);
-	}
-
-	ClosePCjrAudio();
-	//ClosePCSpeaker();
-#if defined(MPU401)
-	CloseMPU401();
-#elif defined(IMFC)
-	CloseIMFC();
-#elif defined(SB)
-	CloseSB();
-#elif defined(DBS2P)
-	CloseDBS2P(lpt);
-#endif
-
-	ResetYMF262();
-	ResetYM3812();
-
 	return 0;
 }

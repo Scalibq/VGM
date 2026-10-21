@@ -26,7 +26,7 @@
 
 // Dummy routines
 void DummyInit(OutputDevice* pDev) {}
-void DummyDeInit(OutputDevice* pDev) {}
+#define DummyDeInit DummyInit
 
 // Single chip, single byte command
 // For SN76489, MIDI
@@ -70,21 +70,31 @@ uint8_t huge* Skip2x2(OutputDevice* pDev, uint8_t huge* pBuf)
 	return pBuf;
 }
 
-// Device list, default to dummy output
-SN76489Dev SNReg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipSN76489, 0xC0 }, { DummyInit, DummyDeInit, SkipSN76489, 0xC0 } };
-SAA1099Dev SAAReg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipSAA1099, 0x220, 0x221 }, { DummyInit, DummyDeInit, SkipSAA1099, 0x222, 0x223 } };
-AY8930Dev AYReg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipAY8930, 0x188, 0x18A }, { DummyInit, DummyDeInit, SkipAY8930, 0x220, 0x224 } };
-OPL2Dev OPL2Reg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipYM3812, 0x388, 0x389 }, { DummyInit, DummyDeInit, SkipYM3812, 0x388, 0x389 } };
-OPL3Dev OPL3Reg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipYMF262, { 0x220, 0x221 }, { 0x222, 0x223 } }, { DummyInit, DummyDeInit, SkipYMF262, { 0x220, 0x221 }, { 0x222, 0x223 } } };
-MPUDev MPUReg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipMIDI, 0x330, 0x331 }, { DummyInit, DummyDeInit, SkipMIDI, 0x330, 0x331 } };
-IMFCDev IMFCReg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipMIDI, 0x2A20 }, { DummyInit, DummyDeInit, SkipMIDI, 0x2A20 } };
-YM2151Dev YMReg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipYM2151, 0x22E, 0x22F }, { DummyInit, DummyDeInit, SkipYM2151, 0x24E, 0x24F } };
-YM2203Dev YM03Reg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipYM2203, 0x188, 0x18A }, { DummyInit, DummyDeInit, SkipYM2203, 0x188, 0x18A } };
-YM2608Dev YM08Reg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipYM2608, { 0x188, 0x18A }, { 0x18C, 0x18E } }, { DummyInit, DummyDeInit, SkipYM2608, { 0x188, 0x18A }, { 0x18C, 0x18E } } };
-SBMIDIDev SBReg[MAX_MULTICHIP] = { { DummyInit, DummyDeInit, SkipMIDI, 0x220 }, { DummyInit, DummyDeInit, SkipMIDI, 0x240 } };
+// Dummy devices
+#define DummySN76489 Dummy1x1
+#define DummyMIDI Dummy1x1
+#define DummySAA1099 Dummy1x2
+#define DummyAY8930 Dummy1x2
+#define DummyYM3812 Dummy1x2
+#define DummyYM2151 Dummy1x2
+#define DummyYM2203 Dummy1x2
+#define DummyYMF262 Dummy2x2
+#define DummyYM2608 Dummy2x2
 
-uint16_t lpt;
-bool opl322 = false;
+OutputDevice Dummy1x1 = { DummyInit, DummyDeInit, Skip1x1 };
+OutputDevice Dummy1x2 = { DummyInit, DummyDeInit, Skip1x2 };
+OutputDevice Dummy2x2 = { DummyInit, DummyDeInit, Skip2x2 };
+
+// Device list, default to dummy output
+OutputDevice* pSN76489[MAX_MULTICHIP] = { &DummySN76489, &DummySN76489 };
+OutputDevice* pSAA1099[MAX_MULTICHIP] = { &DummySAA1099, &DummySAA1099 };
+OutputDevice* pAY8930[MAX_MULTICHIP] = { &DummyAY8930, &DummyAY8930 };
+OutputDevice* pOPL2[MAX_MULTICHIP] = { &DummyYM3812, &DummyYM3812 };
+OutputDevice* pOPL3[MAX_MULTICHIP] = { &DummyYMF262, &DummyYMF262 };
+OutputDevice* pMIDI[MAX_MULTICHIP] = { &DummyMIDI, &DummyMIDI };
+OutputDevice* pYM2151[MAX_MULTICHIP] = { &DummyYM2151, &DummyYM2151 };
+OutputDevice* pYM2203[MAX_MULTICHIP] = { &DummyYM2203, &DummyYM2203 };
+OutputDevice* pYM2608[MAX_MULTICHIP] = { &DummyYM2608, &DummyYM2608 };
 
 void SetOPL3(OutputDevice* pDev, uint16_t base)
 {
@@ -99,6 +109,14 @@ void SetOPL3(OutputDevice* pDev, uint16_t base)
 	pOPL3->port0.data = base + 1;
 	pOPL3->port1.command = base + 2;
 	pOPL3->port1.data = base + 3;
+
+	// TODO
+	/*
+	if (opl322)
+		SetYMF262(1, 0);
+	else
+		SetYMF262(0, 0);
+	*/
 }
 
 // Special SysEx message, 'Turn General MIDI System On'
@@ -488,6 +506,8 @@ void ResetYM3812(OutputDevice* pDev)
 	uint16_t r, j;
 	volatile uint8_t delay;
 	
+	// TODO
+	/*
 	// Write 0 to all YM3812 registers
 	for (r = 0; r < 256; r++)
 	{
@@ -503,6 +523,7 @@ void ResetYM3812(OutputDevice* pDev)
 			delay = inp(OPL2Reg[0].command);
 #endif
 	}
+	*/
 }
 
 void SetYMF262(OutputDevice* pDev, uint8_t opl3, uint8_t fourOp)
@@ -512,6 +533,8 @@ void SetYMF262(OutputDevice* pDev, uint8_t opl3, uint8_t fourOp)
 	
 	// Enable OPL3-mode so both ports can be reset
 	// Enable OPL3 mode
+	// TODO
+	/*
 #if defined(OPL3LPT)
 	WriteOPL3LPTPort1Addr(lpt, 5);
 	WriteOPL3LPTData(lpt, 1);
@@ -599,6 +622,7 @@ void SetYMF262(OutputDevice* pDev, uint8_t opl3, uint8_t fourOp)
 	for (j = 0; j < 3; j++)
 		delay = inp(OPL3Reg[0].port1.command);
 #endif
+	*/
 }
 
 void ResetYMF262(OutputDevice* pDev)
@@ -706,7 +730,7 @@ uint8_t huge* PlayAY8930(OutputDevice* pDev, uint8_t huge* pBuf)
 uint8_t huge* PlayYM3812(OutputDevice* pDev, uint8_t huge* pBuf)
 {
 	uint8_t count;
-	uint16_t i, j;
+	uint16_t j;
 	volatile uint8_t delay;
 		
 	OPL2Dev* pOPL2 = (OPL2Dev*)pDev;
@@ -737,6 +761,7 @@ uint8_t huge* PlayDualOPL2OnOPL3(OutputDevice* pDev, uint8_t huge* pBuf)
 
 	count = *pBuf++;
 
+	/*
 	while (count--)
 	{
 		// OPL3-compatible mode for dual OPL2
@@ -785,6 +810,7 @@ uint8_t huge* PlayDualOPL2OnOPL3(OutputDevice* pDev, uint8_t huge* pBuf)
 				delay = inp(OPL3Reg[o].port0.command);
 		}
 	}
+	*/
 	
 	return pBuf;
 }
@@ -799,8 +825,8 @@ uint8_t huge* PlayOPL2LPT(OutputDevice* pDev, uint8_t huge* pBuf)
 
 	while (count--)
 	{
-		WriteOPL2LPTAddr(lpt, *pBuf++);
-		WriteOPL2LPTData(lpt, *pBuf++);
+		WriteOPL2LPTAddr(pOPL2LPT->base, *pBuf++);
+		WriteOPL2LPTData(pOPL2LPT->base, *pBuf++);
 	}
 
 	return pBuf;

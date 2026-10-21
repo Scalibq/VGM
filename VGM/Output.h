@@ -79,12 +79,14 @@ typedef struct
 		uint16_t command;
 		uint16_t data;
 	} port1;
+	bool opl322;
 } OPL3Dev;
 
 typedef struct
 {
 	OutputDevice device;
 	uint16_t base;
+	bool opl322;
 } OPL3LPTDev;
 
 typedef struct
@@ -135,22 +137,17 @@ typedef struct
 	uint16_t base;
 } SBMIDIDev;
 
-extern SN76489Dev SNReg[MAX_MULTICHIP];
-extern SAA1099Dev SAAReg[MAX_MULTICHIP];
-extern AY8930Dev AYReg[MAX_MULTICHIP];
-extern OPL2Dev OPL2Reg[MAX_MULTICHIP];
-extern OPL3Dev OPL3Reg[MAX_MULTICHIP];
-extern MPUDev MPUReg[MAX_MULTICHIP];
-extern IMFCDev IMFCReg[MAX_MULTICHIP];
-extern YM2151Dev YMReg[MAX_MULTICHIP];
-extern YM2203Dev YM03Reg[MAX_MULTICHIP];
-extern YM2608Dev YM08Reg[MAX_MULTICHIP];
-extern SBMIDIDev SBReg[MAX_MULTICHIP];
+extern OutputDevice* pSN76489[MAX_MULTICHIP];
+extern OutputDevice* pSAA1099[MAX_MULTICHIP];
+extern OutputDevice* pAY8930[MAX_MULTICHIP];
+extern OutputDevice* pOPL2[MAX_MULTICHIP];
+extern OutputDevice* pOPL3[MAX_MULTICHIP];
+extern OutputDevice* pMIDI[MAX_MULTICHIP];
+extern OutputDevice* pYM2151[MAX_MULTICHIP];
+extern OutputDevice* pYM2203[MAX_MULTICHIP];
+extern OutputDevice* pYM2608[MAX_MULTICHIP];
 
 #define SNMplxr 0x61	// MC14529b sound multiplexor chip in the PCjr
-
-extern uint16_t lpt;
-extern bool opl322;
 
 void OutputMIDI(uint16_t base, uint8_t huge* pBuf, uint16_t len);
 
